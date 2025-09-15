@@ -1,0 +1,5 @@
+{
+  "name": "Kirby's Ascent: 2.5D Platformer",
+  "description": "A 2.5D Kirby-style platformer game where the user has to jump through the level going higher and higher. The game features several checkpoints for the player to respawn. This is the base game engine and assets, prepared for a future level creator.",
+  "requestFramePermissions": []
+}
