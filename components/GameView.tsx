@@ -4,8 +4,7 @@ import { Platform } from './Platform';
 import { Checkpoint } from './Checkpoint';
 import { Trap } from './Trap';
 import { Scenery } from './Scenery';
-import { EditorToolbar } from './EditorToolbar';
-import { EditorPropertiesPanel } from './EditorPropertiesPanel';
+import { EditorSidebar } from './EditorSidebar';
 import { useGameLoop } from '../hooks/useGameLoop';
 import { useKeyboardInput } from '../hooks/useKeyboardInput';
 import { PlayerState, Vector2D, PlatformData, CheckpointData, LevelData, Theme, TrapData } from '../types';
@@ -638,109 +637,119 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
   };
 
   return (
-    <>
-      <EditorToolbar 
-        mode={mode}
-        theme={theme}
-        onToggleMode={handleToggleMode}
-        onSetTheme={onSetTheme}
-        onAddPlatform={() => handleAddObject('platform')}
-        onAddCheckpoint={() => handleAddObject('checkpoint')}
-        onAddTrap={() => handleAddObject('trap')}
-        onDeleteSelected={handleDeleteSelected}
-        isObjectSelected={selectedObjectId !== null}
-        onSave={handleSave}
-        onExport={handleExport}
-        onExit={onExit}
-        levelName={levelName}
-        onLevelNameChange={setLevelName}
-        saveStatus={saveStatus}
-      />
-      <div 
-        className={`relative rounded-2xl shadow-2xl overflow-hidden border-8 border-gray-700 ${outerContainerClass}`}
-        style={gameViewportStyle}
-        onWheel={handleWheel}
-        onMouseMove={mode === 'edit' ? handleEditorMouseMove : undefined}
-        onMouseUp={mode === 'edit' ? handleEditorMouseUp : undefined}
-        onMouseDown={mode === 'edit' ? handleContainerMouseDown : undefined}
-        ref={gameAreaRef}
-      >
-        {mode === 'edit' && selectedObjectData?.type === 'platform' && (
-            <EditorPropertiesPanel
-                selectedObject={selectedObjectData}
-                onUpdatePlatform={handleUpdatePlatform}
-            />
+    <div className="flex flex-row items-start justify-center gap-4">
+      {/* Game Area */}
+      <div className="flex flex-col items-center">
+        {mode === 'play' && (
+           <div style={{width: GAME_WIDTH}} className="p-2 mb-2 bg-gray-800 rounded-lg shadow-lg flex items-center justify-between gap-2">
+                <button onClick={onExit} className="px-3 py-2 rounded-lg transition-colors text-white text-sm bg-gray-700 hover:bg-gray-600">{'< Back'}</button>
+                <h1 className="text-lg font-bold text-white hidden sm:block">{levelName}</h1>
+                <button onClick={handleToggleMode} className="px-3 py-2 rounded-lg transition-colors text-white text-sm bg-gray-700 hover:bg-gray-600">Edit</button>
+            </div>
         )}
         <div 
-          className="absolute top-0 left-0 w-full"
-          style={levelContainerStyle}
+            className={`relative rounded-2xl shadow-2xl overflow-hidden border-8 border-gray-700 ${outerContainerClass}`}
+            style={gameViewportStyle}
+            onWheel={handleWheel}
+            onMouseMove={mode === 'edit' ? handleEditorMouseMove : undefined}
+            onMouseUp={mode === 'edit' ? handleEditorMouseUp : undefined}
+            onMouseDown={mode === 'edit' ? handleContainerMouseDown : undefined}
+            ref={gameAreaRef}
         >
-          {THEME_CONFIG[theme].scenery.map(scenery => (
-            <Scenery key={scenery.id} {...scenery} cameraY={cameraY} />
-          ))}
-          {platforms.map(platform => (
-            <Platform 
-              key={platform.id} 
-              {...platform}
-              isSelected={mode === 'edit' && selectedObjectId === platform.id}
-              isEditable={mode === 'edit'}
-              onMouseDown={(e) => handleEditorMouseDown(e, platform.id, 'platform')}
-              onResizeHandleMouseDown={(e, dir) => handleEditorMouseDown(e, platform.id, 'platform', dir)}
-            />
-          ))}
-          {checkpoints.map(checkpoint => (
-            <Checkpoint 
-              key={checkpoint.id}
-              {...checkpoint} 
-              isActive={activeCheckpoints.has(checkpoint.id)} 
-              isSelected={mode === 'edit' && selectedObjectId === checkpoint.id}
-              isEditable={mode === 'edit'}
-              onMouseDown={(e) => handleEditorMouseDown(e, checkpoint.id, 'checkpoint')}
-            />
-          ))}
-          {traps.map(trap => (
-            <Trap
-              key={trap.id}
-              {...trap}
-              isSelected={mode === 'edit' && selectedObjectId === trap.id}
-              isEditable={mode === 'edit'}
-              onMouseDown={(e) => handleEditorMouseDown(e, trap.id, 'trap')}
-              onResizeHandleMouseDown={(e, dir) => handleEditorMouseDown(e, trap.id, 'trap', dir)}
-            />
-          ))}
-
-          {mode === 'edit' && platforms.map(p => {
-              if (!p.movement || selectedObjectId !== p.id) return null;
-              const [start, end] = p.movement.path;
-              return (
-                  <React.Fragment key={`path-overlay-${p.id}`}>
-                      <svg className="absolute top-0 left-0 w-full h-full overflow-visible pointer-events-none" style={{ zIndex: 100 }}>
-                          <line x1={start.x + p.width/2} y1={start.y + p.height/2} x2={end.x + p.width/2} y2={end.y + p.height/2} stroke="rgba(255, 255, 100, 0.7)" strokeWidth="2" strokeDasharray="6,6" />
-                      </svg>
-                      <div
-                          className="absolute w-4 h-4 bg-yellow-400 rounded-full border-2 border-white cursor-pointer"
-                          style={{ left: end.x + p.width/2 - 8, top: end.y + p.height/2 - 8, zIndex: 101 }}
-                          onMouseDown={(e) => handleEditorMouseDown(e, p.id, 'platform', 'move-path-end')}
-                      />
-                  </React.Fragment>
-              )
-          })}
-          
-          {mode === 'play' && <Player playerState={playerState} />}
-        </div>
-        {isFinished && (
-          <div className="absolute inset-0 bg-black bg-opacity-50 flex flex-col justify-center items-center z-50">
-            <h1 className="text-6xl font-bold text-white mb-4" style={{textShadow: '2px 2px 4px rgba(0,0,0,0.5)'}}>You Win!</h1>
-            <p className="text-2xl text-white mb-8">Congratulations!</p>
-            <button
-              onClick={() => resetGame(initialMode === 'play')}
-              className="px-6 py-3 bg-yellow-400 text-black font-bold rounded-lg shadow-lg hover:bg-yellow-500 transition-colors"
+            <div 
+            className="absolute top-0 left-0 w-full"
+            style={levelContainerStyle}
             >
-              Play Again
-            </button>
-          </div>
-        )}
+            {THEME_CONFIG[theme].scenery.map(scenery => (
+                <Scenery key={scenery.id} {...scenery} cameraY={cameraY} />
+            ))}
+            {platforms.map(platform => (
+                <Platform 
+                key={platform.id} 
+                {...platform}
+                isSelected={mode === 'edit' && selectedObjectId === platform.id}
+                isEditable={mode === 'edit'}
+                onMouseDown={(e) => handleEditorMouseDown(e, platform.id, 'platform')}
+                onResizeHandleMouseDown={(e, dir) => handleEditorMouseDown(e, platform.id, 'platform', dir)}
+                />
+            ))}
+            {checkpoints.map(checkpoint => (
+                <Checkpoint 
+                key={checkpoint.id}
+                {...checkpoint} 
+                isActive={activeCheckpoints.has(checkpoint.id)} 
+                isSelected={mode === 'edit' && selectedObjectId === checkpoint.id}
+                isEditable={mode === 'edit'}
+                onMouseDown={(e) => handleEditorMouseDown(e, checkpoint.id, 'checkpoint')}
+                />
+            ))}
+            {traps.map(trap => (
+                <Trap
+                key={trap.id}
+                {...trap}
+                isSelected={mode === 'edit' && selectedObjectId === trap.id}
+                isEditable={mode === 'edit'}
+                onMouseDown={(e) => handleEditorMouseDown(e, trap.id, 'trap')}
+                onResizeHandleMouseDown={(e, dir) => handleEditorMouseDown(e, trap.id, 'trap', dir)}
+                />
+            ))}
+
+            {mode === 'edit' && platforms.map(p => {
+                if (!p.movement || selectedObjectId !== p.id) return null;
+                const [start, end] = p.movement.path;
+                return (
+                    <React.Fragment key={`path-overlay-${p.id}`}>
+                        <svg className="absolute top-0 left-0 w-full h-full overflow-visible pointer-events-none" style={{ zIndex: 100 }}>
+                            <line x1={start.x + p.width/2} y1={start.y + p.height/2} x2={end.x + p.width/2} y2={end.y + p.height/2} stroke="rgba(255, 255, 100, 0.7)" strokeWidth="2" strokeDasharray="6,6" />
+                        </svg>
+                        <div
+                            className="absolute w-4 h-4 bg-yellow-400 rounded-full border-2 border-white cursor-pointer"
+                            style={{ left: end.x + p.width/2 - 8, top: end.y + p.height/2 - 8, zIndex: 101 }}
+                            onMouseDown={(e) => handleEditorMouseDown(e, p.id, 'platform', 'move-path-end')}
+                        />
+                    </React.Fragment>
+                )
+            })}
+            
+            {mode === 'play' && <Player playerState={playerState} />}
+            </div>
+            {isFinished && (
+            <div className="absolute inset-0 bg-black bg-opacity-50 flex flex-col justify-center items-center z-50">
+                <h1 className="text-6xl font-bold text-white mb-4" style={{textShadow: '2px 2px 4px rgba(0,0,0,0.5)'}}>You Win!</h1>
+                <p className="text-2xl text-white mb-8">Congratulations!</p>
+                <button
+                onClick={() => resetGame(initialMode === 'play')}
+                className="px-6 py-3 bg-yellow-400 text-black font-bold rounded-lg shadow-lg hover:bg-yellow-500 transition-colors"
+                >
+                Play Again
+                </button>
+            </div>
+            )}
+        </div>
       </div>
-    </>
+      
+      {/* Sidebar */}
+      {mode === 'edit' && (
+        <EditorSidebar
+            mode={mode}
+            theme={theme}
+            onToggleMode={handleToggleMode}
+            onSetTheme={onSetTheme}
+            onAddPlatform={() => handleAddObject('platform')}
+            onAddCheckpoint={() => handleAddObject('checkpoint')}
+            onAddTrap={() => handleAddObject('trap')}
+            onDeleteSelected={handleDeleteSelected}
+            isObjectSelected={selectedObjectId !== null}
+            onSave={handleSave}
+            onExport={handleExport}
+            onExit={onExit}
+            levelName={levelName}
+            onLevelNameChange={setLevelName}
+            saveStatus={saveStatus}
+            selectedObject={selectedObjectData?.type === 'platform' ? selectedObjectData : null}
+            onUpdatePlatform={handleUpdatePlatform}
+        />
+      )}
+    </div>
   );
 };
