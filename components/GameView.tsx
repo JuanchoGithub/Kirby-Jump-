@@ -11,14 +11,15 @@ import {
   GRAVITY, JUMP_STRENGTH, PLAYER_SPEED, PLAYER_WIDTH, PLAYER_HEIGHT,
   GAME_WIDTH, GAME_HEIGHT, CAMERA_SCROLL_THRESHOLD, LEVEL_HEIGHT_MAX, GRID_SIZE
 } from '../constants';
-import { DAY_SCENERY, AFTERNOON_SCENERY, NIGHT_SCENERY } from '../game/level';
+import { DAY_SCENERY, AFTERNOON_SCENERY, NIGHT_SCENERY, TWILIGHT_SCENERY } from '../game/level';
 import { saveLevel as saveLevelToStorage, getLevels } from '../utils/levelStore';
 
 
 const THEME_CONFIG = {
   day: { bg: 'bg-sky-400', scenery: DAY_SCENERY },
   afternoon: { bg: 'bg-orange-400', scenery: AFTERNOON_SCENERY },
-  night: { bg: 'bg-gray-800', scenery: NIGHT_SCENERY }
+  night: { bg: 'bg-gray-800', scenery: NIGHT_SCENERY },
+  twilight: { bg: '', scenery: TWILIGHT_SCENERY }
 };
 
 interface GameViewProps {
@@ -316,7 +317,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
 
   const gridPattern = useMemo(() => {
     if (mode !== 'edit') return {};
-    const gridColor = theme === 'night' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+    const gridColor = theme === 'night' || theme === 'twilight' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
     return {
       backgroundImage: `
         linear-gradient(to right, ${gridColor} 1px, transparent 1px),
@@ -325,6 +326,29 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
       backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
     };
   }, [mode, theme]);
+
+  const outerContainerClass = theme === 'twilight' ? '' : THEME_CONFIG[theme].bg;
+  
+  const levelContainerStyle = { 
+      height: LEVEL_HEIGHT_MAX,
+      transform: `translateY(${-cameraY}px)`,
+      ...gridPattern
+  };
+
+  const gameViewportStyle: React.CSSProperties = {
+    width: GAME_WIDTH, 
+    height: GAME_HEIGHT, 
+    perspective: '1000px', 
+    cursor: mode === 'edit' ? 'grab' : 'auto',
+    ...(theme === 'twilight' && {
+        // Apply a multi-stop gradient to the viewport, sized to the full level height.
+        // Animate backgroundPosition instead of applying the background to a huge scrolling div to prevent banding.
+        backgroundImage: 'linear-gradient(to bottom, #0f172a, #1e3a8a, #3c5a99, #60a5fa, #a690c8, #fb923c, #fcd34d)',
+        backgroundSize: `100% ${LEVEL_HEIGHT_MAX}px`,
+        backgroundRepeat: 'no-repeat',
+        backgroundPosition: `0px ${-cameraY}px`,
+    }),
+  };
 
   return (
     <>
@@ -345,8 +369,8 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
         saveStatus={saveStatus}
       />
       <div 
-        className={`relative rounded-2xl shadow-2xl overflow-hidden border-8 border-gray-700 ${THEME_CONFIG[theme].bg}`}
-        style={{ width: GAME_WIDTH, height: GAME_HEIGHT, perspective: '1000px', cursor: mode === 'edit' ? 'grab' : 'auto' }}
+        className={`relative rounded-2xl shadow-2xl overflow-hidden border-8 border-gray-700 ${outerContainerClass}`}
+        style={gameViewportStyle}
         onWheel={handleWheel}
         onMouseMove={mode === 'edit' ? handleEditorMouseMove : undefined}
         onMouseUp={mode === 'edit' ? handleEditorMouseUp : undefined}
@@ -355,11 +379,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
       >
         <div 
           className="absolute top-0 left-0 w-full"
-          style={{ 
-              height: LEVEL_HEIGHT_MAX,
-              transform: `translateY(${-cameraY}px)`,
-              ...gridPattern
-          }}
+          style={levelContainerStyle}
         >
           {mode === 'edit' && (
              <>

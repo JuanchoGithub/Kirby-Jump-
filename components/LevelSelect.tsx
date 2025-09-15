@@ -33,17 +33,18 @@ const isValidLevelData = (data: any): data is LevelData => {
 
 export const LevelSelect: React.FC<LevelSelectProps> = ({ onPlayLevel, onEditLevel, onBack }) => {
     const [levels, setLevels] = useState<LevelData[]>([]);
+    const [isManaging, setIsManaging] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         setLevels(getLevels());
     }, []);
 
-    const handleDelete = (levelName: string) => {
-        if (window.confirm(`Are you sure you want to delete "${levelName}"?`)) {
-            deleteLevel(levelName); // The side-effect: remove from storage
-            // Update state directly from the previous state for a guaranteed UI update
-            setLevels(prevLevels => prevLevels.filter(level => level.name !== levelName));
+    const handleRemove = (levelName: string) => {
+        if (window.confirm(`Are you sure you want to remove "${levelName}"? This action cannot be undone.`)) {
+            deleteLevel(levelName);
+            // Re-fetch the levels from the source of truth to ensure the UI is in sync.
+            setLevels(getLevels());
         }
     };
     
@@ -64,7 +65,7 @@ export const LevelSelect: React.FC<LevelSelectProps> = ({ onPlayLevel, onEditLev
                 
                 if (isValidLevelData(parsedData)) {
                     saveLevel(parsedData);
-                    setLevels(getLevels()); // Re-fetch after import
+                    setLevels(getLevels());
                     alert(`Level "${parsedData.name}" imported successfully!`);
                 } else {
                     throw new Error("Invalid level file format.");
@@ -73,7 +74,6 @@ export const LevelSelect: React.FC<LevelSelectProps> = ({ onPlayLevel, onEditLev
                 console.error("Failed to import level:", error);
                 alert(`Error importing level: ${error instanceof Error ? error.message : "Unknown error"}`);
             } finally {
-                // Reset file input to allow importing the same file again
                 if (event.target) {
                     event.target.value = '';
                 }
@@ -88,28 +88,42 @@ export const LevelSelect: React.FC<LevelSelectProps> = ({ onPlayLevel, onEditLev
                 <h1 className="text-4xl font-bold">My Levels</h1>
                 <div className="flex gap-4">
                     <button onClick={handleImportClick} className="px-4 py-2 bg-indigo-600 rounded-lg hover:bg-indigo-500 transition-colors">
-                        Import Level
+                        Import
+                    </button>
+                     <button onClick={() => setIsManaging(!isManaging)} className={`px-4 py-2 rounded-lg font-semibold transition-colors ${isManaging ? 'bg-green-600 hover:bg-green-500' : 'bg-yellow-600 hover:bg-yellow-500'}`}>
+                        {isManaging ? 'Done' : 'Manage'}
                     </button>
                     <button onClick={onBack} className="px-4 py-2 bg-gray-600 rounded-lg hover:bg-gray-500 transition-colors">
-                        &lt; Back to Menu
+                        &lt; Back
                     </button>
                 </div>
             </div>
            
-            <div className="space-y-4 max-h-96 overflow-y-auto pr-4">
+            <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
                 {levels.length > 0 ? (
                     levels.map(level => (
-                        <div key={level.name} className="flex justify-between items-center p-4 bg-gray-700 rounded-lg">
-                            <span className="font-semibold text-lg">{level.name}</span>
-                            <div className="flex gap-2">
-                                <button onClick={() => onPlayLevel(level)} className="px-3 py-1 bg-green-500 rounded hover:bg-green-400 transition-colors">Play</button>
-                                <button onClick={() => onEditLevel(level)} className="px-3 py-1 bg-blue-500 rounded hover:bg-blue-400 transition-colors">Edit</button>
-                                <button onClick={() => handleDelete(level.name)} className="px-3 py-1 bg-red-600 rounded hover:bg-red-500 transition-colors">Delete</button>
+                        <div key={level.name} className="flex justify-between items-center gap-4 p-4 bg-gray-700 rounded-lg">
+                            <span className="font-semibold text-lg truncate min-w-0">{level.name}</span>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                                {isManaging ? (
+                                    <button 
+                                        onClick={() => handleRemove(level.name)} 
+                                        className="px-4 py-2 bg-rose-600 rounded-lg hover:bg-rose-500 transition-colors text-white font-bold"
+                                        aria-label={`Remove level ${level.name}`}
+                                    >
+                                        Remove
+                                    </button>
+                                ) : (
+                                    <>
+                                        <button onClick={() => onPlayLevel(level)} className="px-3 py-1 bg-green-500 rounded hover:bg-green-400 transition-colors">Play</button>
+                                        <button onClick={() => onEditLevel(level)} className="px-3 py-1 bg-blue-500 rounded hover:bg-blue-400 transition-colors">Edit</button>
+                                    </>
+                                )}
                             </div>
                         </div>
                     ))
                 ) : (
-                    <p className="text-center text-gray-400 italic">No custom levels found. Create one in the editor!</p>
+                    <p className="text-center text-gray-400 italic py-8">No custom levels found. Create one in the editor!</p>
                 )}
             </div>
              <input

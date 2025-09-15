@@ -83,6 +83,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         <IconButton onClick={() => onSetTheme('day')} active={theme === 'day'} title="Day Theme">Day</IconButton>
         <IconButton onClick={() => onSetTheme('afternoon')} active={theme === 'afternoon'} title="Afternoon Theme">Aft</IconButton>
         <IconButton onClick={() => onSetTheme('night')} active={theme === 'night'} title="Night Theme">Night</IconButton>
+        <IconButton onClick={() => onSetTheme('twilight')} active={theme === 'twilight'} title="Twilight Theme">Twi</IconButton>
       </div>
     </div>
   );

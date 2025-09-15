@@ -14,7 +14,7 @@ export interface PlatformData extends GameObject {}
 
 export interface CheckpointData extends GameObject {}
 
-export type Theme = 'day' | 'afternoon' | 'night';
+export type Theme = 'day' | 'afternoon' | 'night' | 'twilight';
 
 export interface SceneryData extends GameObject {
   depth: number;

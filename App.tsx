@@ -3,13 +3,14 @@ import { MainMenu } from './components/MainMenu';
 import { LevelSelect } from './components/LevelSelect';
 import { GameView } from './components/GameView';
 import { LevelData, Theme } from './types';
-import { LEVEL_PLATFORMS as INITIAL_PLATFORMS, LEVEL_CHECKPOINTS as INITIAL_CHECKPOINTS, DAY_SCENERY, AFTERNOON_SCENERY, NIGHT_SCENERY } from './game/level';
+import { LEVEL_PLATFORMS as INITIAL_PLATFORMS, LEVEL_CHECKPOINTS as INITIAL_CHECKPOINTS, DAY_SCENERY, AFTERNOON_SCENERY, NIGHT_SCENERY, TWILIGHT_SCENERY } from './game/level';
 import { GAME_WIDTH } from './constants';
 
 const THEME_CONFIG = {
   day: { bg: 'bg-sky-400', scenery: DAY_SCENERY },
   afternoon: { bg: 'bg-orange-400', scenery: AFTERNOON_SCENERY },
-  night: { bg: 'bg-gray-800', scenery: NIGHT_SCENERY }
+  night: { bg: 'bg-gray-800', scenery: NIGHT_SCENERY },
+  twilight: { bg: 'bg-indigo-800', scenery: TWILIGHT_SCENERY }
 };
 
 const ORIGINAL_LEVEL: LevelData = {
