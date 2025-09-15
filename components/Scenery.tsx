@@ -1,5 +1,6 @@
 import React from 'react';
 import { SceneryData } from '../types';
+import { GAME_WIDTH } from '../constants';
 
 interface SceneryProps extends SceneryData {
     cameraY: number;
@@ -27,9 +28,7 @@ const Hill1: React.FC = () => (
 );
 
 const Sun: React.FC = () => (
-    <div className="w-full h-full bg-yellow-300 rounded-full" style={{
-        boxShadow: '0 0 50px 20px rgba(253, 224, 71, 0.5)'
-    }}/>
+    <div className="w-full h-full bg-yellow-300 rounded-full animate-glow"/>
 );
 
 const Bird: React.FC = () => (
@@ -40,24 +39,26 @@ const Bird: React.FC = () => (
 );
 
 const Moon: React.FC = () => (
-    <div className="w-full h-full bg-gray-200 rounded-full" style={{
-        boxShadow: '0 0 30px 5px rgba(229, 231, 235, 0.3)'
-    }} />
+    <div className="w-full h-full bg-gray-200 rounded-full animate-moon-glow" />
 );
 
 const Star: React.FC = () => (
-    <div className="w-full h-full bg-white rounded-full animate-pulse" />
+    <div className="w-full h-full bg-white rounded-full" />
 );
 
 const Planet: React.FC = () => (
     <div className="relative w-full h-full flex items-center justify-center">
         <div className="absolute w-full h-full bg-amber-600 rounded-full" />
-        <div className="absolute w-[160%] h-[20%] border-2 border-amber-300 rounded-full rotate-[-30deg]" />
+        <div className="absolute w-[160%] h-[20%] border-2 border-amber-300 rounded-full animate-ring-rotate" />
     </div>
 );
 
+const ShootingStar: React.FC = () => (
+    <div className="w-24 h-0.5 bg-gradient-to-r from-white/80 to-transparent transform rotate-[135deg]" />
+);
 
-const assetMap = {
+
+const assetMap: { [key in SceneryData['asset']]: React.ReactElement } = {
     cloud1: <Cloud1 />,
     cloud2: <Cloud2 />,
     hill1: <Hill1 />,
@@ -66,10 +67,30 @@ const assetMap = {
     moon: <Moon />,
     star: <Star />,
     planet: <Planet />,
+    shootingStar: <ShootingStar />,
 };
 
-export const Scenery: React.FC<SceneryProps> = ({ asset, position, width, height, depth, cameraY }) => {
-  const parallaxY = cameraY / depth;
+export const Scenery: React.FC<SceneryProps> = ({ id, asset, position, width, height, depth, cameraY }) => {
+  // To counteract the main container's scroll (-cameraY), we apply a positive transform.
+  // The amount of transform is proportional to the camera's position and inversely proportional to the depth.
+  // This makes distant objects appear to scroll slower.
+  const parallaxY = cameraY * (1 - 1 / depth);
+
+  const wrapperStyle: React.CSSProperties = {};
+  let wrapperClassName = '';
+
+  if (asset === 'cloud1' || asset === 'cloud2') {
+    wrapperClassName = position.x < GAME_WIDTH / 2 ? 'animate-drift' : 'animate-drift-reverse';
+    wrapperStyle.animationDuration = `${15 + (id % 15)}s`;
+  } else if (asset === 'star') {
+    wrapperClassName = 'animate-twinkle';
+    wrapperStyle.animationDelay = `${(id % 30) / 10}s`;
+    wrapperStyle.animationDuration = `${2 + (id % 20) / 10}s`;
+  } else if (asset === 'shootingStar') {
+    wrapperClassName = 'animate-shoot';
+    wrapperStyle.animationDelay = `${(id % 80) / 10}s`;
+    wrapperStyle.animationDuration = `${1.5 + (id % 20) / 10}s`;
+  }
 
   return (
     <div
@@ -83,7 +104,9 @@ export const Scenery: React.FC<SceneryProps> = ({ asset, position, width, height
         zIndex: -depth
       }}
     >
-        {assetMap[asset]}
+        <div className={wrapperClassName} style={wrapperStyle}>
+            {assetMap[asset]}
+        </div>
     </div>
   );
 };

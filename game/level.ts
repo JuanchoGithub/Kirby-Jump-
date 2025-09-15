@@ -128,16 +128,24 @@ export const AFTERNOON_SCENERY: SceneryData[] = [
 ];
 
 export const NIGHT_SCENERY: SceneryData[] = [
+    // Shooting Stars
+    { id: 450, asset: 'shootingStar', position: { x: 550, y: LEVEL_HEIGHT_MAX - 1000 }, width: 1, height: 1, depth: 15 },
+    { id: 451, asset: 'shootingStar', position: { x: 200, y: LEVEL_HEIGHT_MAX - 2100 }, width: 1, height: 1, depth: 12 },
+    { id: 452, asset: 'shootingStar', position: { x: 400, y: LEVEL_HEIGHT_MAX - 3200 }, width: 1, height: 1, depth: 18 },
+
     // Low Sky
     { id: 402, asset: 'star', position: { x: 100, y: LEVEL_HEIGHT_MAX - 400 }, width: 10, height: 10, depth: 8 },
     { id: 408, asset: 'star', position: { x: 500, y: LEVEL_HEIGHT_MAX - 550 }, width: 15, height: 15, depth: 6 },
     { id: 409, asset: 'star', position: { x: 300, y: LEVEL_HEIGHT_MAX - 700 }, width: 10, height: 10, depth: 7 },
+    { id: 420, asset: 'star', position: { x: 400, y: LEVEL_HEIGHT_MAX - 900 }, width: 12, height: 12, depth: 9 },
+
 
     // Mid Sky
     { id: 403, asset: 'star', position: { x: 200, y: LEVEL_HEIGHT_MAX - 1300 }, width: 10, height: 10, depth: 6 },
     { id: 404, asset: 'star', position: { x: 350, y: LEVEL_HEIGHT_MAX - 1200 }, width: 10, height: 10, depth: 7 },
     { id: 405, asset: 'star', position: { x: 500, y: LEVEL_HEIGHT_MAX - 1400 }, width: 15, height: 15, depth: 5 },
     { id: 410, asset: 'star', position: { x: 80, y: LEVEL_HEIGHT_MAX - 1550 }, width: 10, height: 10, depth: 8 },
+    { id: 421, asset: 'star', position: { x: 580, y: LEVEL_HEIGHT_MAX - 1700 }, width: 10, height: 10, depth: 6 },
     
     // High Sky
     { id: 406, asset: 'star', position: { x: 50, y: LEVEL_HEIGHT_MAX - 2500 }, width: 10, height: 10, depth: 8 },
@@ -174,11 +182,13 @@ export const TWILIGHT_SCENERY: SceneryData[] = [
     { id: 510, asset: 'star', position: { x: 300, y: LEVEL_HEIGHT_MAX - 1800 }, width: 10, height: 10, depth: 6 },
 
     // High Sky (Night)
+    { id: 550, asset: 'shootingStar', position: { x: 100, y: LEVEL_HEIGHT_MAX - 2800 }, width: 1, height: 1, depth: 16 },
     { id: 511, asset: 'star', position: { x: 100, y: LEVEL_HEIGHT_MAX - 2100 }, width: 15, height: 15, depth: 5 },
     { id: 512, asset: 'star', position: { x: 550, y: LEVEL_HEIGHT_MAX - 2300 }, width: 10, height: 10, depth: 7 },
     { id: 513, asset: 'star', position: { x: 250, y: LEVEL_HEIGHT_MAX - 2500 }, width: 10, height: 10, depth: 8 },
 
     // Upper Atmosphere (Space)
+    { id: 551, asset: 'shootingStar', position: { x: 450, y: LEVEL_HEIGHT_MAX - 3500 }, width: 1, height: 1, depth: 14 },
     { id: 514, asset: 'moon', position: { x: 450, y: LEVEL_HEIGHT_MAX - 3400 }, width: 80, height: 80, depth: 20 },
     { id: 515, asset: 'star', position: { x: 120, y: LEVEL_HEIGHT_MAX - 3000 }, width: 10, height: 10, depth: 7 },
     { id: 516, asset: 'star', position: { x: 480, y: LEVEL_HEIGHT_MAX - 3200 }, width: 15, height: 15, depth: 5 },

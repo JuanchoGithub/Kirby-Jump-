@@ -31,7 +31,7 @@ export type Theme = 'day' | 'afternoon' | 'night' | 'twilight';
 
 export interface SceneryData extends GameObject {
   depth: number;
-  asset: 'cloud1' | 'cloud2' | 'hill1' | 'sun' | 'bird' | 'moon' | 'star' | 'planet';
+  asset: 'cloud1' | 'cloud2' | 'hill1' | 'sun' | 'bird' | 'moon' | 'star' | 'planet' | 'shootingStar';
 }
 
 export interface PlayerState {

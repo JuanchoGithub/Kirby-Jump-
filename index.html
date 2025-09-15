@@ -15,6 +15,47 @@
   }
 }
 </script>
+<style>
+@keyframes drift {
+  0% { transform: translateX(0); }
+  50% { transform: translateX(15px); }
+  100% { transform: translateX(0); }
+}
+@keyframes drift-reverse {
+  0% { transform: translateX(0); }
+  50% { transform: translateX(-15px); }
+  100% { transform: translateX(0); }
+}
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 50px 20px rgba(253, 224, 71, 0.5); }
+  50% { box-shadow: 0 0 70px 25px rgba(253, 224, 71, 0.6); }
+}
+@keyframes moon-glow {
+  0%, 100% { box-shadow: 0 0 30px 5px rgba(229, 231, 235, 0.3); }
+  50% { box-shadow: 0 0 45px 10px rgba(229, 231, 235, 0.4); }
+}
+@keyframes ring-rotate {
+  from { transform: rotate(-30deg) scale(1, 0.95); }
+  to { transform: rotate(-30deg) scale(1, 1.05); }
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0.6; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+@keyframes shoot {
+  0% { transform: translate(0, 0); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translate(-600px, 300px); opacity: 0; }
+}
+.animate-drift { animation: drift ease-in-out infinite; }
+.animate-drift-reverse { animation: drift-reverse ease-in-out infinite; }
+.animate-glow { animation: glow 5s ease-in-out infinite; }
+.animate-moon-glow { animation: moon-glow 6s ease-in-out infinite; }
+.animate-ring-rotate { animation: ring-rotate 4s ease-in-out infinite alternate; }
+.animate-twinkle { animation: twinkle ease-in-out infinite alternate; }
+.animate-shoot { animation: shoot linear infinite; }
+</style>
 </head>
   <body>
     <div id="root"></div>
