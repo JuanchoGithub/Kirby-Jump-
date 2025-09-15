@@ -1,3 +1,4 @@
+// FIX: Removed self-import of Vector2D which caused a conflict.
 export interface Vector2D {
   x: number;
   y: number;
@@ -10,7 +11,12 @@ export interface GameObject {
   height: number;
 }
 
-export interface PlatformData extends GameObject {}
+export interface PlatformData extends GameObject {
+  movement?: {
+    path: [Vector2D, Vector2D]; // Start and end points
+    speed: number; // pixels per second
+  };
+}
 
 export interface CheckpointData extends GameObject {}
 

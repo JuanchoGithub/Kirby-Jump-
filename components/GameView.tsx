@@ -5,6 +5,7 @@ import { Checkpoint } from './Checkpoint';
 import { Trap } from './Trap';
 import { Scenery } from './Scenery';
 import { EditorToolbar } from './EditorToolbar';
+import { EditorPropertiesPanel } from './EditorPropertiesPanel';
 import { useGameLoop } from '../hooks/useGameLoop';
 import { useKeyboardInput } from '../hooks/useKeyboardInput';
 import { PlayerState, Vector2D, PlatformData, CheckpointData, LevelData, Theme, TrapData } from '../types';
@@ -48,11 +49,26 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
       isFalling: false
     };
   };
+  
+  const initializeMovingPlatforms = (initialPlatforms: PlatformData[]) => {
+      const newMap = new Map<number, { progress: number; direction: 1 | -1 }>();
+      const updatedPlatforms = initialPlatforms.map(p => {
+        if (p.movement) {
+          newMap.set(p.id, { progress: 0, direction: 1 });
+          // Ensure platform starts at path[0] for consistent behavior
+          return { ...p, position: p.movement.path[0] };
+        }
+        return p;
+      });
+      setMovingPlatformState(newMap);
+      return updatedPlatforms;
+    };
 
   const [levelName, setLevelName] = useState(levelData.name);
-  const [platforms, setPlatforms] = useState<PlatformData[]>(levelData.platforms);
+  const [platforms, setPlatforms] = useState<PlatformData[]>([]);
   const [checkpoints, setCheckpoints] = useState<CheckpointData[]>(levelData.checkpoints);
   const [traps, setTraps] = useState<TrapData[]>(levelData.traps || []);
+  const [movingPlatformState, setMovingPlatformState] = useState<Map<number, { progress: number; direction: 1 | -1; }>>(new Map());
 
   const [playerState, setPlayerState] = useState<PlayerState>(getInitialPlayerState(checkpoints));
   const [cameraY, setCameraY] = useState(LEVEL_HEIGHT_MAX - GAME_HEIGHT);
@@ -64,7 +80,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   
   const editorAction = useRef<{
-    type: 'move' | 'resize-left' | 'resize-right',
+    type: 'move' | 'resize-left' | 'resize-right' | 'move-path-end',
     startPos: Vector2D,
     objectId: number,
     originalObject: PlatformData | CheckpointData | TrapData,
@@ -81,18 +97,56 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
   const gameAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    resetGame(false);
-    setLevelName(levelData.name);
-    setPlatforms(levelData.platforms);
-    setCheckpoints(levelData.checkpoints);
-    setTraps(levelData.traps || []);
-    setCameraY(LEVEL_HEIGHT_MAX - GAME_HEIGHT);
+    resetGame(true);
   }, [levelData, initialMode]);
 
 
-  const gameTick = useCallback(() => {
+  const gameTick = useCallback((deltaTime: number) => {
     if (isFinished) return;
 
+    // --- Update Moving Platforms ---
+    const platformDeltas = new Map<number, Vector2D>();
+    const updatedPlatforms = platforms.map(p => {
+        if (!p.movement || mode === 'edit') return p;
+
+        const state = movingPlatformState.get(p.id);
+        if (!state) return p;
+
+        const { path, speed } = p.movement;
+        const pathVector = { x: path[1].x - path[0].x, y: path[1].y - path[0].y };
+        const pathLength = Math.sqrt(pathVector.x ** 2 + pathVector.y ** 2);
+        if (pathLength === 0) return p;
+
+        const distanceToMove = (speed * (deltaTime / 1000)) * state.direction;
+        let newProgress = state.progress + distanceToMove / pathLength;
+        
+        let newDirection = state.direction;
+        if (newProgress >= 1) {
+            newProgress = 1;
+            newDirection = -1;
+        } else if (newProgress <= 0) {
+            newProgress = 0;
+            newDirection = 1;
+        }
+        
+        movingPlatformState.set(p.id, { progress: newProgress, direction: newDirection });
+
+        const newPosition = {
+            x: path[0].x + pathVector.x * newProgress,
+            y: path[0].y + pathVector.y * newProgress,
+        };
+
+        platformDeltas.set(p.id, {
+            x: newPosition.x - p.position.x,
+            y: newPosition.y - p.position.y
+        });
+
+        return { ...p, position: newPosition };
+    });
+    setPlatforms(updatedPlatforms);
+
+
+    // --- Update Player ---
     setPlayerState(prev => {
       let { position, velocity, isGrounded, lastCheckpoint } = { ...prev };
       
@@ -104,14 +158,15 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
 
       if (activeKeys.has('ArrowUp') && isGrounded) {
         velocity.y = JUMP_STRENGTH;
-        isGrounded = false;
       }
       
       velocity.y += GRAVITY;
       const nextPosition = { x: position.x + velocity.x, y: position.y + velocity.y };
 
       let onGround = false;
+      let groundedPlatformId: number | null = null;
       const playerBottom = nextPosition.y + PLAYER_HEIGHT;
+
       for (const platform of platforms) {
         const platformTop = platform.position.y;
         const playerWasAbove = position.y + PLAYER_HEIGHT <= platformTop + 1;
@@ -119,16 +174,24 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
           velocity.y = 0;
           nextPosition.y = platformTop - PLAYER_HEIGHT;
           onGround = true;
+          groundedPlatformId = platform.id;
           break;
         }
       }
       isGrounded = onGround;
       position = { ...nextPosition };
+      
+      if (isGrounded && groundedPlatformId !== null) {
+          const delta = platformDeltas.get(groundedPlatformId);
+          if (delta) {
+              position.x += delta.x;
+              position.y += delta.y;
+          }
+      }
 
       if (position.x < 0) position.x = 0;
       if (position.x > GAME_WIDTH - PLAYER_WIDTH) position.x = GAME_WIDTH - PLAYER_WIDTH;
 
-      // Trap collision
       for (const trap of traps) {
           if (position.x < trap.position.x + trap.width &&
               position.x + PLAYER_WIDTH > trap.position.x &&
@@ -174,18 +237,22 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
 
       return { position, velocity, isGrounded, lastCheckpoint, isJumping: !isGrounded && velocity.y < 0, isFalling: !isGrounded && velocity.y > 0 };
     });
-  }, [activeKeys, cameraY, activeCheckpoints, isFinished, platforms, checkpoints, traps]);
+  }, [cameraY, activeCheckpoints, isFinished, platforms, checkpoints, traps, mode, movingPlatformState]);
 
   useGameLoop(gameTick, mode === 'edit' || isFinished);
 
   const resetGame = (fullReset: boolean) => {
-    const initialCheckpoints = fullReset ? levelData.checkpoints : checkpoints;
-    setPlayerState(getInitialPlayerState(initialCheckpoints));
-    if(fullReset) {
-      setPlatforms(levelData.platforms);
+    if (fullReset) {
+      setLevelName(levelData.name);
+      const initialPlatforms = initializeMovingPlatforms(levelData.platforms);
+      setPlatforms(initialPlatforms);
       setCheckpoints(levelData.checkpoints);
       setTraps(levelData.traps || []);
-      setLevelName(levelData.name);
+      setPlayerState(getInitialPlayerState(levelData.checkpoints));
+    } else {
+      const initialPlatforms = initializeMovingPlatforms(platforms);
+      setPlatforms(initialPlatforms);
+      setPlayerState(getInitialPlayerState(checkpoints));
     }
     setCameraY(LEVEL_HEIGHT_MAX - GAME_HEIGHT);
     setActiveCheckpoints(new Set());
@@ -211,7 +278,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
   
   const snapToGrid = (value: number) => Math.round(value / GRID_SIZE) * GRID_SIZE;
 
-  const handleEditorMouseDown = (e: React.MouseEvent, objectId: number, type: 'platform' | 'checkpoint' | 'trap', handle?: 'left' | 'right') => {
+  const handleEditorMouseDown = (e: React.MouseEvent, objectId: number, type: 'platform' | 'checkpoint' | 'trap', handle?: 'left' | 'right' | 'move-path-end') => {
     e.stopPropagation();
     setSelectedObjectId(objectId);
     
@@ -223,8 +290,17 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     const originalObject = objectList.find(o => o.id === objectId);
     if (!originalObject) return;
     
+    // FIX: Map 'left'/'right' to 'resize-left'/'resize-right' for the editor action type.
     if (handle) {
-      editorAction.current = { type: handle === 'left' ? 'resize-left' : 'resize-right', objectId, startPos: getMousePos(e), originalObject };
+      let actionType: 'resize-left' | 'resize-right' | 'move-path-end';
+      if (handle === 'left') {
+        actionType = 'resize-left';
+      } else if (handle === 'right') {
+        actionType = 'resize-right';
+      } else {
+        actionType = handle; // 'move-path-end'
+      }
+      editorAction.current = { type: actionType, objectId, startPos: getMousePos(e), originalObject };
     } else {
       editorAction.current = { type: 'move', objectId, startPos: getMousePos(e), originalObject };
     }
@@ -249,6 +325,14 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
       } else {
         setTraps(prev => prev.map(t => t.id === objectId ? { ...t, position: newPos } : t));
       }
+    } else if (type === 'move-path-end') {
+        const platform = originalObject as PlatformData;
+        if (!platform.movement) return;
+        const newPathEnd = {
+            x: snapToGrid(platform.movement.path[1].x + delta.x),
+            y: snapToGrid(platform.movement.path[1].y + delta.y),
+        };
+        setPlatforms(prev => prev.map(p => p.id === objectId ? { ...p, movement: { ...p.movement!, path: [p.movement!.path[0], newPathEnd] } } : p));
     } else { // Resize
       if (platforms.some(p => p.id === objectId)) {
         const platform = originalObject as PlatformData;
@@ -287,6 +371,22 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
   };
 
   const handleEditorMouseUp = () => {
+    if (editorAction.current?.type === 'move') {
+      const { objectId, originalObject } = editorAction.current;
+      const platform = platforms.find(p => p.id === objectId);
+      if (platform?.movement) {
+        // If a moving platform was moved, update its path start point
+        const delta = {
+            x: platform.position.x - originalObject.position.x,
+            y: platform.position.y - originalObject.position.y
+        };
+        const newPath: [Vector2D, Vector2D] = [
+            platform.position,
+            { x: platform.movement.path[1].x + delta.x, y: platform.movement.path[1].y + delta.y }
+        ];
+        handleUpdatePlatform(objectId, { movement: { ...platform.movement, path: newPath }});
+      }
+    }
     editorAction.current = null;
   };
   
@@ -341,7 +441,14 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     }
 
     setSaveStatus('saving');
-    const levelToSave: LevelData = { name: trimmedName, platforms, checkpoints, traps };
+    const platformsToSave = platforms.map(p => {
+        if (p.movement) {
+            // Reset position to the start of the path for saving
+            return { ...p, position: p.movement.path[0] };
+        }
+        return p;
+    });
+    const levelToSave: LevelData = { name: trimmedName, platforms: platformsToSave, checkpoints, traps };
     saveLevelToStorage(levelToSave);
     
     setTimeout(() => {
@@ -351,7 +458,13 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
   };
 
   const handleExport = () => {
-    const levelToExport: LevelData = { name: levelName, platforms, checkpoints, traps };
+    const platformsToSave = platforms.map(p => {
+        if (p.movement) {
+            return { ...p, position: p.movement.path[0] };
+        }
+        return p;
+    });
+    const levelToExport: LevelData = { name: levelName, platforms: platformsToSave, checkpoints, traps };
     const jsonString = JSON.stringify(levelToExport, null, 2);
     const blob = new Blob([jsonString], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -362,6 +475,25 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+  
+  const handleUpdatePlatform = (id: number, updates: Partial<PlatformData>) => {
+    setPlatforms(prev => prev.map(p => {
+        if (p.id !== id) return p;
+        const newPlatform = { ...p, ...updates };
+        
+        if (updates.movement && !p.movement) {
+            setMovingPlatformState(prevMap => new Map(prevMap).set(id, { progress: 0, direction: 1 }));
+            newPlatform.position = updates.movement.path[0];
+        } else if (updates.movement === undefined && p.movement) {
+            setMovingPlatformState(prevMap => {
+                const newMap = new Map(prevMap);
+                newMap.delete(id);
+                return newMap;
+            });
+        }
+        return newPlatform;
+    }));
   };
 
   const gridPattern = useMemo(() => {
@@ -375,6 +507,20 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
       backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
     };
   }, [mode, theme]);
+  
+  const selectedObjectData = useMemo(() => {
+      if (selectedObjectId === null) return null;
+      const platform = platforms.find(p => p.id === selectedObjectId);
+      if (platform) return { id: selectedObjectId, type: 'platform' as const, data: platform };
+      
+      const checkpoint = checkpoints.find(c => c.id === selectedObjectId);
+      if (checkpoint) return { id: selectedObjectId, type: 'checkpoint' as const, data: checkpoint };
+      
+      const trap = traps.find(t => t.id === selectedObjectId);
+      if (trap) return { id: selectedObjectId, type: 'trap' as const, data: trap };
+
+      return null;
+  }, [selectedObjectId, platforms, checkpoints, traps]);
 
   const outerContainerClass = theme === 'twilight' ? '' : THEME_CONFIG[theme].bg;
   
@@ -425,19 +571,16 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
         onMouseDown={mode === 'edit' ? handleContainerMouseDown : undefined}
         ref={gameAreaRef}
       >
+        {mode === 'edit' && selectedObjectData?.type === 'platform' && (
+            <EditorPropertiesPanel
+                selectedObject={selectedObjectData}
+                onUpdatePlatform={handleUpdatePlatform}
+            />
+        )}
         <div 
           className="absolute top-0 left-0 w-full"
           style={levelContainerStyle}
         >
-          {mode === 'edit' && (
-             <>
-                <div style={{position: 'absolute', top: 0, left: 0, width: '100%', borderTop: '2px dashed red'}}><span className="bg-red-500 text-white text-xs p-1">Top Boundary</span></div>
-                <div style={{position: 'absolute', left: 0, top: 0, height: LEVEL_HEIGHT_MAX, borderLeft: '2px dashed red'}} />
-                <div style={{position: 'absolute', right: 0, top: 0, height: LEVEL_HEIGHT_MAX, borderRight: '2px dashed red'}} />
-                <div style={{position: 'absolute', top: LEVEL_HEIGHT_MAX, left: 0, width: '100%', borderTop: '2px dashed red'}}><span className="bg-red-500 text-white text-xs p-1">Bottom Boundary</span></div>
-             </>
-          )}
-
           {THEME_CONFIG[theme].scenery.map(scenery => (
             <Scenery key={scenery.id} {...scenery} cameraY={cameraY} />
           ))}
@@ -471,6 +614,24 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
               onResizeHandleMouseDown={(e, dir) => handleEditorMouseDown(e, trap.id, 'trap', dir)}
             />
           ))}
+
+          {mode === 'edit' && platforms.map(p => {
+              if (!p.movement || selectedObjectId !== p.id) return null;
+              const [start, end] = p.movement.path;
+              return (
+                  <React.Fragment key={`path-overlay-${p.id}`}>
+                      <svg className="absolute top-0 left-0 w-full h-full overflow-visible pointer-events-none" style={{ zIndex: 100 }}>
+                          <line x1={start.x + p.width/2} y1={start.y + p.height/2} x2={end.x + p.width/2} y2={end.y + p.height/2} stroke="rgba(255, 255, 100, 0.7)" strokeWidth="2" strokeDasharray="6,6" />
+                      </svg>
+                      <div
+                          className="absolute w-4 h-4 bg-yellow-400 rounded-full border-2 border-white cursor-pointer"
+                          style={{ left: end.x + p.width/2 - 8, top: end.y + p.height/2 - 8, zIndex: 101 }}
+                          onMouseDown={(e) => handleEditorMouseDown(e, p.id, 'platform', 'move-path-end')}
+                      />
+                  </React.Fragment>
+              )
+          })}
+          
           {mode === 'play' && <Player playerState={playerState} />}
         </div>
         {isFinished && (

@@ -10,7 +10,19 @@ export const LEVEL_PLATFORMS: PlatformData[] = [
   
   // First Checkpoint area
   { id: 4, position: { x: 400, y: LEVEL_HEIGHT_MAX - 550 }, width: 150, height: 20 },
-  { id: 5, position: { x: 150, y: LEVEL_HEIGHT_MAX - 650 }, width: 100, height: 20 },
+  { 
+    id: 5, 
+    position: { x: 150, y: LEVEL_HEIGHT_MAX - 650 }, 
+    width: 100, 
+    height: 20,
+    movement: {
+        path: [
+            { x: 150, y: LEVEL_HEIGHT_MAX - 650 },
+            { x: 300, y: LEVEL_HEIGHT_MAX - 650 }
+        ],
+        speed: 50 // pixels per second
+    }
+  },
   { id: 6, position: { x: 250, y: LEVEL_HEIGHT_MAX - 780 }, width: 180, height: 20 },
 
   // Higher up
@@ -20,7 +32,19 @@ export const LEVEL_PLATFORMS: PlatformData[] = [
 
   // Second Checkpoint area
   { id: 10, position: { x: 0, y: LEVEL_HEIGHT_MAX - 1330 }, width: 150, height: 20 },
-  { id: 11, position: { x: 300, y: LEVEL_HEIGHT_MAX - 1480 }, width: 150, height: 20 },
+    { 
+    id: 11,
+    position: { x: 400, y: LEVEL_HEIGHT_MAX - 1480 },
+    width: 150,
+    height: 20,
+    movement: {
+        path: [
+            { x: 400, y: LEVEL_HEIGHT_MAX - 1480 },
+            { x: 400, y: LEVEL_HEIGHT_MAX - 1380 }
+        ],
+        speed: 40
+    }
+  },
   { id: 12, position: { x: 200, y: LEVEL_HEIGHT_MAX - 1600 }, width: 100, height: 20 },
 
   // Path to victory

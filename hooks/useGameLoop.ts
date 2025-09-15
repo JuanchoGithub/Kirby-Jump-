@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react';
 
-export const useGameLoop = (callback: () => void, paused: boolean = false) => {
-  // FIX: Explicitly initialize useRef with undefined to satisfy toolchains that expect an argument.
+export const useGameLoop = (callback: (deltaTime: number) => void, paused: boolean = false) => {
   const requestRef = useRef<number | undefined>(undefined);
+  const lastTimeRef = useRef<number>(performance.now());
   const callbackRef = useRef(callback);
 
   // Update callback ref to avoid stale closures
@@ -11,12 +11,15 @@ export const useGameLoop = (callback: () => void, paused: boolean = false) => {
   }, [callback]);
 
   useEffect(() => {
-    const animate = (_time: number) => {
-      callbackRef.current();
+    const animate = (time: number) => {
+      const deltaTime = time - lastTimeRef.current;
+      lastTimeRef.current = time;
+      callbackRef.current(deltaTime);
       requestRef.current = requestAnimationFrame(animate);
     };
 
     if (!paused) {
+      lastTimeRef.current = performance.now(); // Reset timer when unpausing
       requestRef.current = requestAnimationFrame(animate);
     } else {
       if (requestRef.current) {

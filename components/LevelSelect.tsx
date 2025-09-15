@@ -8,20 +8,30 @@ interface LevelSelectProps {
     onBack: () => void;
 }
 
+const isValidPlatform = (p: any): p is PlatformData =>
+    typeof p.id === 'number' &&
+    typeof p.position?.x === 'number' &&
+    typeof p.position?.y === 'number' &&
+    typeof p.width === 'number' &&
+    typeof p.height === 'number' &&
+    (p.movement === undefined || (
+        typeof p.movement.speed === 'number' &&
+        Array.isArray(p.movement.path) &&
+        p.movement.path.length === 2 &&
+        typeof p.movement.path[0]?.x === 'number' &&
+        typeof p.movement.path[0]?.y === 'number' &&
+        typeof p.movement.path[1]?.x === 'number' &&
+        typeof p.movement.path[1]?.y === 'number'
+    ));
+
 const isValidLevelData = (data: any): data is LevelData => {
     return (
         data &&
         typeof data.name === 'string' &&
         Array.isArray(data.platforms) &&
         Array.isArray(data.checkpoints) &&
-        (data.traps === undefined || Array.isArray(data.traps)) && // Traps are optional for backward compatibility
-        data.platforms.every((p: any): p is PlatformData => 
-            typeof p.id === 'number' &&
-            typeof p.position?.x === 'number' &&
-            typeof p.position?.y === 'number' &&
-            typeof p.width === 'number' &&
-            typeof p.height === 'number'
-        ) &&
+        (data.traps === undefined || Array.isArray(data.traps)) &&
+        data.platforms.every(isValidPlatform) &&
         data.checkpoints.every((c: any): c is CheckpointData => 
             typeof c.id === 'number' &&
             typeof c.position?.x === 'number' &&
