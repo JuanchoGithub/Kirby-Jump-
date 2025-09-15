@@ -24,6 +24,7 @@ export type TrapType = 'spikes';
 
 export interface TrapData extends GameObject {
   type: TrapType;
+  platformId?: number | null;
 }
 
 export type Theme = 'day' | 'afternoon' | 'night' | 'twilight';

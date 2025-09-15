@@ -1,4 +1,4 @@
-import { PlatformData, CheckpointData, SceneryData } from '../types';
+import { PlatformData, CheckpointData, SceneryData, TrapData } from '../types';
 import { GAME_WIDTH, LEVEL_HEIGHT_MAX } from '../constants';
 
 export const LEVEL_PLATFORMS: PlatformData[] = [
@@ -60,6 +60,10 @@ export const LEVEL_CHECKPOINTS: CheckpointData[] = [
   { id: 101, position: { x: 290, y: LEVEL_HEIGHT_MAX - 820 }, width: 40, height: 40 },
   { id: 102, position: { x: 230, y: LEVEL_HEIGHT_MAX - 1640 }, width: 40, height: 40 },
   { id: 103, position: { x: 280, y: LEVEL_HEIGHT_MAX - 2120 }, width: 40, height: 40 }, // Victory checkpoint
+];
+
+export const LEVEL_TRAPS: TrapData[] = [
+    { id: 300, type: 'spikes', position: {x: 160, y: LEVEL_HEIGHT_MAX - 670}, width: 80, height: 20, platformId: 5 },
 ];
 
 export const DAY_SCENERY: SceneryData[] = [

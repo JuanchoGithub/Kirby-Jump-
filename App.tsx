@@ -3,7 +3,7 @@ import { MainMenu } from './components/MainMenu';
 import { LevelSelect } from './components/LevelSelect';
 import { GameView } from './components/GameView';
 import { LevelData, Theme } from './types';
-import { LEVEL_PLATFORMS as INITIAL_PLATFORMS, LEVEL_CHECKPOINTS as INITIAL_CHECKPOINTS, DAY_SCENERY, AFTERNOON_SCENERY, NIGHT_SCENERY, TWILIGHT_SCENERY } from './game/level';
+import { LEVEL_PLATFORMS as INITIAL_PLATFORMS, LEVEL_CHECKPOINTS as INITIAL_CHECKPOINTS, LEVEL_TRAPS as INITIAL_TRAPS, DAY_SCENERY, AFTERNOON_SCENERY, NIGHT_SCENERY, TWILIGHT_SCENERY } from './game/level';
 import { GAME_WIDTH } from './constants';
 
 const THEME_CONFIG = {
@@ -17,7 +17,7 @@ const ORIGINAL_LEVEL: LevelData = {
   name: "Kirby's Ascent",
   platforms: INITIAL_PLATFORMS,
   checkpoints: INITIAL_CHECKPOINTS,
-  traps: [],
+  traps: INITIAL_TRAPS,
 };
 
 const App: React.FC = () => {

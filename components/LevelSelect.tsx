@@ -45,7 +45,8 @@ const isValidLevelData = (data: any): data is LevelData => {
             typeof t.position?.x === 'number' &&
             typeof t.position?.y === 'number' &&
             typeof t.width === 'number' &&
-            typeof t.height === 'number'
+            typeof t.height === 'number' &&
+            (t.platformId === undefined || t.platformId === null || typeof t.platformId === 'number')
         ))
     );
 };

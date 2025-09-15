@@ -84,6 +84,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     startPos: Vector2D,
     objectId: number,
     originalObject: PlatformData | CheckpointData | TrapData,
+    attachedTraps?: { trapId: number, offset: Vector2D }[]
   } | null>(null);
 
   const nextId = useRef(Math.max(
@@ -102,12 +103,12 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
 
 
   const gameTick = useCallback((deltaTime: number) => {
-    if (isFinished) return;
+    if (isFinished || mode === 'edit') return;
 
     // --- Update Moving Platforms ---
     const platformDeltas = new Map<number, Vector2D>();
     const updatedPlatforms = platforms.map(p => {
-        if (!p.movement || mode === 'edit') return p;
+        if (!p.movement) return p;
 
         const state = movingPlatformState.get(p.id);
         if (!state) return p;
@@ -143,7 +144,24 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
 
         return { ...p, position: newPosition };
     });
+    
+    // --- Update Traps on Moving Platforms ---
+    const updatedTraps = traps.map(trap => {
+        if (trap.platformId && platformDeltas.has(trap.platformId)) {
+            const delta = platformDeltas.get(trap.platformId)!;
+            return {
+                ...trap,
+                position: {
+                    x: trap.position.x + delta.x,
+                    y: trap.position.y + delta.y,
+                }
+            };
+        }
+        return trap;
+    });
+
     setPlatforms(updatedPlatforms);
+    setTraps(updatedTraps);
 
 
     // --- Update Player ---
@@ -167,7 +185,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
       let groundedPlatformId: number | null = null;
       const playerBottom = nextPosition.y + PLAYER_HEIGHT;
 
-      for (const platform of platforms) {
+      for (const platform of updatedPlatforms) {
         const platformTop = platform.position.y;
         const playerWasAbove = position.y + PLAYER_HEIGHT <= platformTop + 1;
         if (playerBottom >= platformTop && playerWasAbove && nextPosition.x + PLAYER_WIDTH > platform.position.x && nextPosition.x < platform.position.x + platform.width && velocity.y >= 0) {
@@ -192,7 +210,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
       if (position.x < 0) position.x = 0;
       if (position.x > GAME_WIDTH - PLAYER_WIDTH) position.x = GAME_WIDTH - PLAYER_WIDTH;
 
-      for (const trap of traps) {
+      for (const trap of updatedTraps) {
           if (position.x < trap.position.x + trap.width &&
               position.x + PLAYER_WIDTH > trap.position.x &&
               position.y < trap.position.y + trap.height &&
@@ -289,6 +307,16 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
 
     const originalObject = objectList.find(o => o.id === objectId);
     if (!originalObject) return;
+
+    let attachedTrapsInfo: { trapId: number, offset: Vector2D }[] | undefined = undefined;
+    if (type === 'platform' && !handle) {
+        const platform = originalObject as PlatformData;
+        attachedTrapsInfo = traps.filter(t => t.platformId === platform.id)
+            .map(t => ({
+                trapId: t.id,
+                offset: { x: t.position.x - platform.position.x, y: t.position.y - platform.position.y }
+            }));
+    }
     
     // FIX: Map 'left'/'right' to 'resize-left'/'resize-right' for the editor action type.
     if (handle) {
@@ -302,7 +330,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
       }
       editorAction.current = { type: actionType, objectId, startPos: getMousePos(e), originalObject };
     } else {
-      editorAction.current = { type: 'move', objectId, startPos: getMousePos(e), originalObject };
+      editorAction.current = { type: 'move', objectId, startPos: getMousePos(e), originalObject, attachedTraps: attachedTrapsInfo };
     }
   };
 
@@ -313,17 +341,56 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     const delta = { x: currentPos.x - startPos.x, y: currentPos.y - startPos.y };
 
     if (type === 'move') {
-      const newPos = {
-        x: snapToGrid(originalObject.position.x + delta.x),
-        y: snapToGrid(originalObject.position.y + delta.y),
-      };
-      
       if (platforms.some(p => p.id === objectId)) {
+        const platform = originalObject as PlatformData;
+        const newPos = {
+          x: snapToGrid(platform.position.x + delta.x),
+          y: snapToGrid(platform.position.y + delta.y),
+        };
         setPlatforms(prev => prev.map(p => p.id === objectId ? { ...p, position: newPos } : p));
+        
+        const attachedTraps = editorAction.current?.attachedTraps;
+        if(attachedTraps && attachedTraps.length > 0) {
+            setTraps(prevTraps => {
+                const nextTraps = [...prevTraps];
+                for (const attached of attachedTraps) {
+                    const trapIndex = nextTraps.findIndex(t => t.id === attached.trapId);
+                    if (trapIndex !== -1) {
+                        nextTraps[trapIndex] = {
+                            ...nextTraps[trapIndex],
+                            position: {
+                                x: newPos.x + attached.offset.x,
+                                y: newPos.y + attached.offset.y
+                            }
+                        };
+                    }
+                }
+                return nextTraps;
+            });
+        }
+
       } else if (checkpoints.some(c => c.id === objectId)) {
+        const newPos = {
+            x: snapToGrid(originalObject.position.x + delta.x),
+            y: snapToGrid(originalObject.position.y + delta.y),
+        };
         setCheckpoints(prev => prev.map(c => c.id === objectId ? { ...c, position: newPos } : c));
-      } else {
-        setTraps(prev => prev.map(t => t.id === objectId ? { ...t, position: newPos } : t));
+      } else if (traps.some(t => t.id === objectId)) {
+        const trap = originalObject as TrapData;
+        
+        const platformsUnderCursor = platforms
+            .filter(p => currentPos.x >= p.position.x && currentPos.x < p.position.x + p.width && currentPos.y > p.position.y)
+            .sort((a,b) => a.position.y - b.position.y);
+        
+        const targetPlatform = platformsUnderCursor[0] || null;
+
+        if (targetPlatform) {
+            const newPos = {
+                x: snapToGrid(currentPos.x - trap.width / 2),
+                y: targetPlatform.position.y - trap.height,
+            };
+            setTraps(prev => prev.map(t => t.id === objectId ? { ...t, position: newPos, platformId: targetPlatform.id } : t));
+        }
       }
     } else if (type === 'move-path-end') {
         const platform = originalObject as PlatformData;
@@ -405,21 +472,46 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     if (type === 'platform') {
       const newPlatform: PlatformData = { id: newId, position, width: 150, height: 20 };
       setPlatforms(prev => [...prev, newPlatform]);
+      setSelectedObjectId(newId);
     } else if (type === 'checkpoint') {
       const newCheckpoint: CheckpointData = { id: newId, position, width: 40, height: 40 };
       setCheckpoints(prev => [...prev, newCheckpoint]);
+      setSelectedObjectId(newId);
     } else if (type === 'trap') {
-      const newTrap: TrapData = { id: newId, type: 'spikes', position: { ...position, x: snapToGrid(GAME_WIDTH / 2 - 40)}, width: 80, height: 20 };
-      setTraps(prev => [...prev, newTrap]);
+        const trapWidth = 80;
+        const trapHeight = 20;
+        const centerOfView = { x: GAME_WIDTH / 2, y: cameraY + GAME_HEIGHT / 2 };
+
+        const platformsUnder = platforms
+            .filter(p => centerOfView.x >= p.position.x && centerOfView.x < p.position.x + p.width && centerOfView.y < p.position.y)
+            .sort((a,b) => a.position.y - b.position.y);
+        
+        const targetPlatform = platformsUnder[0] || null;
+
+        if (!targetPlatform) {
+            alert("No platform found below the center of the screen. Add a platform first!");
+            return;
+        }
+
+        const finalPos = {
+            x: snapToGrid(targetPlatform.position.x + targetPlatform.width / 2 - trapWidth / 2),
+            y: targetPlatform.position.y - trapHeight,
+        };
+        const newTrap: TrapData = { id: newId, type: 'spikes', position: finalPos, width: trapWidth, height: trapHeight, platformId: targetPlatform.id };
+        setTraps(prev => [...prev, newTrap]);
+        setSelectedObjectId(newId);
     }
-    setSelectedObjectId(newId);
   };
   
   const handleDeleteSelected = () => {
     if (selectedObjectId === null) return;
+    
+    const isPlatform = platforms.some(p => p.id === selectedObjectId);
+
     setPlatforms(prev => prev.filter(p => p.id !== selectedObjectId));
     setCheckpoints(prev => prev.filter(c => c.id !== selectedObjectId));
-    setTraps(prev => prev.filter(t => t.id !== selectedObjectId));
+    setTraps(prev => prev.filter(t => t.id !== selectedObjectId && (!isPlatform || t.platformId !== selectedObjectId)));
+    
     setSelectedObjectId(null);
   };
   
