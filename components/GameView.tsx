@@ -32,6 +32,19 @@ interface GameViewProps {
   onSetTheme: (theme: Theme) => void;
 }
 
+const getInitialPlatformState = (initialPlatforms: PlatformData[]): { platforms: PlatformData[], movingState: Map<number, { progress: number; direction: 1 | -1; }> } => {
+    const newMap = new Map<number, { progress: number; direction: 1 | -1 }>();
+    const updatedPlatforms = initialPlatforms.map(p => {
+        if (p.movement) {
+            newMap.set(p.id, { progress: 0, direction: 1 });
+            return { ...p, position: p.movement.path[0] };
+        }
+        return p;
+    });
+    return { platforms: updatedPlatforms, movingState: newMap };
+};
+
+
 export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onExit, theme, onSetTheme }) => {
   const getInitialPlayerState = (checkpoints: CheckpointData[]): PlayerState => {
     const sortedCheckpoints = [...checkpoints].sort((a, b) => b.position.y - a.position.y);
@@ -50,27 +63,15 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     };
   };
   
-  const initializeMovingPlatforms = (initialPlatforms: PlatformData[]) => {
-      const newMap = new Map<number, { progress: number; direction: 1 | -1 }>();
-      const updatedPlatforms = initialPlatforms.map(p => {
-        if (p.movement) {
-          newMap.set(p.id, { progress: 0, direction: 1 });
-          // Ensure platform starts at path[0] for consistent behavior
-          return { ...p, position: p.movement.path[0] };
-        }
-        return p;
-      });
-      setMovingPlatformState(newMap);
-      return updatedPlatforms;
-    };
+  const { platforms: initialPlatforms, movingState: initialMovingState } = getInitialPlatformState(levelData.platforms);
 
   const [levelName, setLevelName] = useState(levelData.name);
-  const [platforms, setPlatforms] = useState<PlatformData[]>([]);
+  const [platforms, setPlatforms] = useState<PlatformData[]>(initialPlatforms);
   const [checkpoints, setCheckpoints] = useState<CheckpointData[]>(levelData.checkpoints);
   const [traps, setTraps] = useState<TrapData[]>(levelData.traps || []);
-  const [movingPlatformState, setMovingPlatformState] = useState<Map<number, { progress: number; direction: 1 | -1; }>>(new Map());
+  const [movingPlatformState, setMovingPlatformState] = useState(initialMovingState);
+  const [playerState, setPlayerState] = useState<PlayerState>(() => getInitialPlayerState(levelData.checkpoints));
 
-  const [playerState, setPlayerState] = useState<PlayerState>(getInitialPlayerState(checkpoints));
   const [cameraY, setCameraY] = useState(LEVEL_HEIGHT_MAX - GAME_HEIGHT);
   const [activeCheckpoints, setActiveCheckpoints] = useState<Set<number>>(new Set());
   const [isFinished, setIsFinished] = useState(false);
@@ -97,10 +98,26 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
   const activeKeys = useKeyboardInput();
   const gameAreaRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    resetGame(true);
-  }, [levelData, initialMode]);
+  const resetGame = useCallback((fullReset: boolean) => {
+    const sourcePlatforms = fullReset ? levelData.platforms : platforms;
+    const { platforms: resetPlatforms, movingState: resetMovingState } = getInitialPlatformState(sourcePlatforms);
 
+    setPlatforms(resetPlatforms);
+    setMovingPlatformState(resetMovingState);
+
+    if (fullReset) {
+      setLevelName(levelData.name);
+      setCheckpoints(levelData.checkpoints);
+      setTraps(levelData.traps || []);
+      setPlayerState(getInitialPlayerState(levelData.checkpoints));
+    } else {
+      setPlayerState(getInitialPlayerState(checkpoints));
+    }
+
+    setCameraY(LEVEL_HEIGHT_MAX - GAME_HEIGHT);
+    setActiveCheckpoints(new Set());
+    setIsFinished(false);
+  }, [levelData, platforms, checkpoints]);
 
   const gameTick = useCallback((deltaTime: number) => {
     if (isFinished || mode === 'edit') return;
@@ -259,36 +276,11 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
 
   useGameLoop(gameTick, mode === 'edit' || isFinished);
 
-  const resetGame = (fullReset: boolean) => {
-    if (fullReset) {
-      setLevelName(levelData.name);
-      const initialPlatforms = initializeMovingPlatforms(levelData.platforms);
-      setPlatforms(initialPlatforms);
-      setCheckpoints(levelData.checkpoints);
-      setTraps(levelData.traps || []);
-      setPlayerState(getInitialPlayerState(levelData.checkpoints));
-    } else {
-      const initialPlatforms = initializeMovingPlatforms(platforms);
-      setPlatforms(initialPlatforms);
-      setPlayerState(getInitialPlayerState(checkpoints));
-    }
-    setCameraY(LEVEL_HEIGHT_MAX - GAME_HEIGHT);
-    setActiveCheckpoints(new Set());
-    setIsFinished(false);
-  };
-
   const handleToggleMode = () => {
     if (mode === 'play') {
-      const newMap = new Map<number, { progress: number; direction: 1 | -1 }>();
-      const updatedPlatforms = platforms.map(p => {
-        if (p.movement) {
-          newMap.set(p.id, { progress: 0, direction: 1 });
-          return { ...p, position: p.movement.path[0] };
-        }
-        return p;
-      });
-      setMovingPlatformState(newMap);
-      setPlatforms(updatedPlatforms);
+      const { platforms: resetPlatforms, movingState: resetMovingState } = getInitialPlatformState(platforms);
+      setPlatforms(resetPlatforms);
+      setMovingPlatformState(resetMovingState);
       setMode('edit');
     } else {
       resetGame(false);

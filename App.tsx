@@ -91,6 +91,7 @@ const App: React.FC = () => {
         if (!activeLevel) return null; // Should not happen
         return (
           <GameView 
+            key={`${activeLevel.name}-${initialMode}`}
             levelData={activeLevel}
             initialMode={initialMode}
             onExit={handleExitGame}
