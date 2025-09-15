@@ -63,7 +63,7 @@ export const LEVEL_CHECKPOINTS: CheckpointData[] = [
 ];
 
 export const LEVEL_TRAPS: TrapData[] = [
-    { id: 300, type: 'spikes', position: {x: 160, y: LEVEL_HEIGHT_MAX - 670}, width: 80, height: 20, platformId: 5 },
+    { id: 300, type: 'spikes', position: {x: 150, y: LEVEL_HEIGHT_MAX - 670}, width: 50, height: 20, platformId: 5 },
 ];
 
 export const DAY_SCENERY: SceneryData[] = [
