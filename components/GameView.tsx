@@ -282,10 +282,12 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
         return;
     }
 
+    const originalName = levelData.name;
     const existingLevels = getLevels();
-    const isOverwriting = existingLevels.some(l => l.name === trimmedName);
-    
-    if (isOverwriting) {
+    const conflictingLevel = existingLevels.find(l => l.name === trimmedName);
+
+    // Only ask for confirmation if renaming to a name that conflicts with another existing level.
+    if (conflictingLevel && trimmedName !== originalName) {
         if (!window.confirm(`A level named "${trimmedName}" already exists. Do you want to overwrite it?`)) {
             return;
         }
