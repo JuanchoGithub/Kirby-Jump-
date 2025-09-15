@@ -17,6 +17,7 @@ const ORIGINAL_LEVEL: LevelData = {
   name: "Kirby's Ascent",
   platforms: INITIAL_PLATFORMS,
   checkpoints: INITIAL_CHECKPOINTS,
+  traps: [],
 };
 
 const App: React.FC = () => {
@@ -45,6 +46,7 @@ const App: React.FC = () => {
         name: `New Level ${newId}`,
         platforms: [{ id: 0, position: { x: 0, y: 3980 }, width: GAME_WIDTH, height: 20 }],
         checkpoints: [],
+        traps: [],
       });
     }
     setInitialMode('edit');
@@ -60,7 +62,7 @@ const App: React.FC = () => {
   const handleExitGame = () => {
     setActiveLevel(null);
     // Go back to the level select screen if we came from there, otherwise menu
-    if (activeLevel?.name !== ORIGINAL_LEVEL.name) {
+    if (activeLevel?.name !== ORIGINAL_LEVEL.name && appState !== 'menu') {
        setAppState('select');
     } else {
        setAppState('menu');

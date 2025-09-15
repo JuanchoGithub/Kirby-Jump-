@@ -14,6 +14,12 @@ export interface PlatformData extends GameObject {}
 
 export interface CheckpointData extends GameObject {}
 
+export type TrapType = 'spikes';
+
+export interface TrapData extends GameObject {
+  type: TrapType;
+}
+
 export type Theme = 'day' | 'afternoon' | 'night' | 'twilight';
 
 export interface SceneryData extends GameObject {
@@ -34,4 +40,5 @@ export interface LevelData {
   name: string;
   platforms: PlatformData[];
   checkpoints: CheckpointData[];
+  traps: TrapData[];
 }

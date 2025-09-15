@@ -8,6 +8,7 @@ interface EditorToolbarProps {
   onSetTheme: (theme: Theme) => void;
   onAddPlatform: () => void;
   onAddCheckpoint: () => void;
+  onAddTrap: () => void;
   onDeleteSelected: () => void;
   isObjectSelected: boolean;
   onSave: () => void;
@@ -41,7 +42,7 @@ const getSaveButtonText = (status: 'idle' | 'saving' | 'saved') => {
 
 
 export const EditorToolbar: React.FC<EditorToolbarProps> = ({ 
-  mode, theme, onToggleMode, onSetTheme, onAddPlatform, onAddCheckpoint, 
+  mode, theme, onToggleMode, onSetTheme, onAddPlatform, onAddCheckpoint, onAddTrap,
   onDeleteSelected, isObjectSelected, onSave, onExport, onExit, levelName, onLevelNameChange, saveStatus
 }) => {
   const isEditing = mode === 'edit';
@@ -71,6 +72,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           <>
             <IconButton onClick={onAddPlatform} title="Add Platform">+</IconButton>
             <IconButton onClick={onAddCheckpoint} title="Add Checkpoint">*</IconButton>
+            <IconButton onClick={onAddTrap} title="Add Trap">Trap</IconButton>
             <IconButton onClick={onDeleteSelected} disabled={!isObjectSelected} title="Delete Selected">DEL</IconButton>
             <IconButton onClick={onSave} disabled={saveStatus !== 'idle'} title="Save Level">{getSaveButtonText(saveStatus)}</IconButton>
             <IconButton onClick={onExport} title="Export Level to File">Export</IconButton>

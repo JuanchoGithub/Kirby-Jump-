@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LevelData, PlatformData, CheckpointData } from '../types';
+import { LevelData, PlatformData, CheckpointData, TrapData } from '../types';
 import { getLevels, deleteLevel, saveLevel } from '../utils/levelStore';
 
 interface LevelSelectProps {
@@ -14,6 +14,7 @@ const isValidLevelData = (data: any): data is LevelData => {
         typeof data.name === 'string' &&
         Array.isArray(data.platforms) &&
         Array.isArray(data.checkpoints) &&
+        (data.traps === undefined || Array.isArray(data.traps)) && // Traps are optional for backward compatibility
         data.platforms.every((p: any): p is PlatformData => 
             typeof p.id === 'number' &&
             typeof p.position?.x === 'number' &&
@@ -27,7 +28,15 @@ const isValidLevelData = (data: any): data is LevelData => {
             typeof c.position?.y === 'number' &&
             typeof c.width === 'number' &&
             typeof c.height === 'number'
-        )
+        ) &&
+        (data.traps === undefined || data.traps.every((t: any): t is TrapData => 
+            typeof t.id === 'number' &&
+            typeof t.type === 'string' &&
+            typeof t.position?.x === 'number' &&
+            typeof t.position?.y === 'number' &&
+            typeof t.width === 'number' &&
+            typeof t.height === 'number'
+        ))
     );
 };
 

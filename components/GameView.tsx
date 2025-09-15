@@ -2,11 +2,12 @@ import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import { Player } from './Player';
 import { Platform } from './Platform';
 import { Checkpoint } from './Checkpoint';
+import { Trap } from './Trap';
 import { Scenery } from './Scenery';
 import { EditorToolbar } from './EditorToolbar';
 import { useGameLoop } from '../hooks/useGameLoop';
 import { useKeyboardInput } from '../hooks/useKeyboardInput';
-import { PlayerState, Vector2D, PlatformData, CheckpointData, LevelData, Theme } from '../types';
+import { PlayerState, Vector2D, PlatformData, CheckpointData, LevelData, Theme, TrapData } from '../types';
 import {
   GRAVITY, JUMP_STRENGTH, PLAYER_SPEED, PLAYER_WIDTH, PLAYER_HEIGHT,
   GAME_WIDTH, GAME_HEIGHT, CAMERA_SCROLL_THRESHOLD, LEVEL_HEIGHT_MAX, GRID_SIZE
@@ -51,6 +52,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
   const [levelName, setLevelName] = useState(levelData.name);
   const [platforms, setPlatforms] = useState<PlatformData[]>(levelData.platforms);
   const [checkpoints, setCheckpoints] = useState<CheckpointData[]>(levelData.checkpoints);
+  const [traps, setTraps] = useState<TrapData[]>(levelData.traps || []);
 
   const [playerState, setPlayerState] = useState<PlayerState>(getInitialPlayerState(checkpoints));
   const [cameraY, setCameraY] = useState(LEVEL_HEIGHT_MAX - GAME_HEIGHT);
@@ -65,13 +67,14 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     type: 'move' | 'resize-left' | 'resize-right',
     startPos: Vector2D,
     objectId: number,
-    originalObject: PlatformData | CheckpointData,
+    originalObject: PlatformData | CheckpointData | TrapData,
   } | null>(null);
 
   const nextId = useRef(Math.max(
     0,
     ...levelData.platforms.map(p => p.id),
-    ...levelData.checkpoints.map(c => c.id)
+    ...levelData.checkpoints.map(c => c.id),
+    ...(levelData.traps || []).map(t => t.id)
   ) + 1);
 
   const activeKeys = useKeyboardInput();
@@ -82,6 +85,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     setLevelName(levelData.name);
     setPlatforms(levelData.platforms);
     setCheckpoints(levelData.checkpoints);
+    setTraps(levelData.traps || []);
     setCameraY(LEVEL_HEIGHT_MAX - GAME_HEIGHT);
   }, [levelData, initialMode]);
 
@@ -124,6 +128,19 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
       if (position.x < 0) position.x = 0;
       if (position.x > GAME_WIDTH - PLAYER_WIDTH) position.x = GAME_WIDTH - PLAYER_WIDTH;
 
+      // Trap collision
+      for (const trap of traps) {
+          if (position.x < trap.position.x + trap.width &&
+              position.x + PLAYER_WIDTH > trap.position.x &&
+              position.y < trap.position.y + trap.height &&
+              position.y + PLAYER_HEIGHT > trap.position.y)
+          {
+              position = { ...lastCheckpoint };
+              velocity = { x: 0, y: 0 };
+              break;
+          }
+      }
+
       if (position.y > LEVEL_HEIGHT_MAX) {
         position = { ...lastCheckpoint };
         velocity = { x: 0, y: 0 };
@@ -157,7 +174,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
 
       return { position, velocity, isGrounded, lastCheckpoint, isJumping: !isGrounded && velocity.y < 0, isFalling: !isGrounded && velocity.y > 0 };
     });
-  }, [activeKeys, cameraY, activeCheckpoints, isFinished, platforms, checkpoints]);
+  }, [activeKeys, cameraY, activeCheckpoints, isFinished, platforms, checkpoints, traps]);
 
   useGameLoop(gameTick, mode === 'edit' || isFinished);
 
@@ -167,6 +184,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     if(fullReset) {
       setPlatforms(levelData.platforms);
       setCheckpoints(levelData.checkpoints);
+      setTraps(levelData.traps || []);
       setLevelName(levelData.name);
     }
     setCameraY(LEVEL_HEIGHT_MAX - GAME_HEIGHT);
@@ -193,10 +211,16 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
   
   const snapToGrid = (value: number) => Math.round(value / GRID_SIZE) * GRID_SIZE;
 
-  const handleEditorMouseDown = (e: React.MouseEvent, objectId: number, type: 'platform' | 'checkpoint', handle?: 'left' | 'right') => {
+  const handleEditorMouseDown = (e: React.MouseEvent, objectId: number, type: 'platform' | 'checkpoint' | 'trap', handle?: 'left' | 'right') => {
     e.stopPropagation();
     setSelectedObjectId(objectId);
-    const originalObject = (type === 'platform' ? platforms : checkpoints).find(o => o.id === objectId);
+    
+    let objectList;
+    if (type === 'platform') objectList = platforms;
+    else if (type === 'checkpoint') objectList = checkpoints;
+    else objectList = traps;
+
+    const originalObject = objectList.find(o => o.id === objectId);
     if (!originalObject) return;
     
     if (handle) {
@@ -220,24 +244,44 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
       
       if (platforms.some(p => p.id === objectId)) {
         setPlatforms(prev => prev.map(p => p.id === objectId ? { ...p, position: newPos } : p));
-      } else {
+      } else if (checkpoints.some(c => c.id === objectId)) {
         setCheckpoints(prev => prev.map(c => c.id === objectId ? { ...c, position: newPos } : c));
+      } else {
+        setTraps(prev => prev.map(t => t.id === objectId ? { ...t, position: newPos } : t));
       }
-    } else {
-      const platform = originalObject as PlatformData;
-      let newX = platform.position.x;
-      let newWidth = platform.width;
-      
-      if (type === 'resize-right') {
-        newWidth = Math.max(GRID_SIZE * 2, snapToGrid(platform.width + delta.x));
-      } else if (type === 'resize-left') {
-        const snappedDeltaX = snapToGrid(delta.x);
-        newX = platform.position.x + snappedDeltaX;
-        newWidth = platform.width - snappedDeltaX;
-      }
-      
-      if (newWidth >= GRID_SIZE * 2) {
-        setPlatforms(prev => prev.map(p => p.id === objectId ? { ...p, position: {...p.position, x: newX }, width: newWidth } : p));
+    } else { // Resize
+      if (platforms.some(p => p.id === objectId)) {
+        const platform = originalObject as PlatformData;
+        let newX = platform.position.x;
+        let newWidth = platform.width;
+        
+        if (type === 'resize-right') {
+          newWidth = Math.max(GRID_SIZE * 2, snapToGrid(platform.width + delta.x));
+        } else if (type === 'resize-left') {
+          const snappedDeltaX = snapToGrid(delta.x);
+          newX = platform.position.x + snappedDeltaX;
+          newWidth = platform.width - snappedDeltaX;
+        }
+        
+        if (newWidth >= GRID_SIZE * 2) {
+          setPlatforms(prev => prev.map(p => p.id === objectId ? { ...p, position: {...p.position, x: newX }, width: newWidth } : p));
+        }
+      } else if (traps.some(t => t.id === objectId)) {
+        const trap = originalObject as TrapData;
+        let newX = trap.position.x;
+        let newWidth = trap.width;
+
+        if (type === 'resize-right') {
+          newWidth = Math.max(GRID_SIZE, snapToGrid(trap.width + delta.x));
+        } else if (type === 'resize-left') {
+          const snappedDeltaX = snapToGrid(delta.x);
+          newX = trap.position.x + snappedDeltaX;
+          newWidth = trap.width - snappedDeltaX;
+        }
+
+        if (newWidth >= GRID_SIZE) {
+          setTraps(prev => prev.map(t => t.id === objectId ? { ...t, position: { ...t.position, x: newX }, width: newWidth } : t));
+        }
       }
     }
   };
@@ -255,15 +299,18 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     setCameraY(y => Math.max(0, Math.min(y + e.deltaY, LEVEL_HEIGHT_MAX - GAME_HEIGHT)));
   };
 
-  const handleAddObject = (type: 'platform' | 'checkpoint') => {
+  const handleAddObject = (type: 'platform' | 'checkpoint' | 'trap') => {
     const newId = nextId.current++;
     const position = { x: snapToGrid(GAME_WIDTH / 2 - 75), y: snapToGrid(cameraY + GAME_HEIGHT / 2) };
     if (type === 'platform') {
       const newPlatform: PlatformData = { id: newId, position, width: 150, height: 20 };
       setPlatforms(prev => [...prev, newPlatform]);
-    } else {
+    } else if (type === 'checkpoint') {
       const newCheckpoint: CheckpointData = { id: newId, position, width: 40, height: 40 };
       setCheckpoints(prev => [...prev, newCheckpoint]);
+    } else if (type === 'trap') {
+      const newTrap: TrapData = { id: newId, type: 'spikes', position: { ...position, x: snapToGrid(GAME_WIDTH / 2 - 40)}, width: 80, height: 20 };
+      setTraps(prev => [...prev, newTrap]);
     }
     setSelectedObjectId(newId);
   };
@@ -272,6 +319,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     if (selectedObjectId === null) return;
     setPlatforms(prev => prev.filter(p => p.id !== selectedObjectId));
     setCheckpoints(prev => prev.filter(c => c.id !== selectedObjectId));
+    setTraps(prev => prev.filter(t => t.id !== selectedObjectId));
     setSelectedObjectId(null);
   };
   
@@ -286,7 +334,6 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     const existingLevels = getLevels();
     const conflictingLevel = existingLevels.find(l => l.name === trimmedName);
 
-    // Only ask for confirmation if renaming to a name that conflicts with another existing level.
     if (conflictingLevel && trimmedName !== originalName) {
         if (!window.confirm(`A level named "${trimmedName}" already exists. Do you want to overwrite it?`)) {
             return;
@@ -294,7 +341,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     }
 
     setSaveStatus('saving');
-    const levelToSave: LevelData = { name: trimmedName, platforms, checkpoints };
+    const levelToSave: LevelData = { name: trimmedName, platforms, checkpoints, traps };
     saveLevelToStorage(levelToSave);
     
     setTimeout(() => {
@@ -304,7 +351,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
   };
 
   const handleExport = () => {
-    const levelToExport: LevelData = { name: levelName, platforms, checkpoints };
+    const levelToExport: LevelData = { name: levelName, platforms, checkpoints, traps };
     const jsonString = JSON.stringify(levelToExport, null, 2);
     const blob = new Blob([jsonString], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -343,8 +390,6 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     perspective: '1000px', 
     cursor: mode === 'edit' ? 'grab' : 'auto',
     ...(theme === 'twilight' && {
-        // Apply a multi-stop gradient to the viewport, sized to the full level height.
-        // Animate backgroundPosition instead of applying the background to a huge scrolling div to prevent banding.
         backgroundImage: 'linear-gradient(to bottom, #0f172a, #1e3a8a, #3c5a99, #60a5fa, #a690c8, #fb923c, #fcd34d)',
         backgroundSize: `100% ${LEVEL_HEIGHT_MAX}px`,
         backgroundRepeat: 'no-repeat',
@@ -361,6 +406,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
         onSetTheme={onSetTheme}
         onAddPlatform={() => handleAddObject('platform')}
         onAddCheckpoint={() => handleAddObject('checkpoint')}
+        onAddTrap={() => handleAddObject('trap')}
         onDeleteSelected={handleDeleteSelected}
         isObjectSelected={selectedObjectId !== null}
         onSave={handleSave}
@@ -413,6 +459,16 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
               isSelected={mode === 'edit' && selectedObjectId === checkpoint.id}
               isEditable={mode === 'edit'}
               onMouseDown={(e) => handleEditorMouseDown(e, checkpoint.id, 'checkpoint')}
+            />
+          ))}
+          {traps.map(trap => (
+            <Trap
+              key={trap.id}
+              {...trap}
+              isSelected={mode === 'edit' && selectedObjectId === trap.id}
+              isEditable={mode === 'edit'}
+              onMouseDown={(e) => handleEditorMouseDown(e, trap.id, 'trap')}
+              onResizeHandleMouseDown={(e, dir) => handleEditorMouseDown(e, trap.id, 'trap', dir)}
             />
           ))}
           {mode === 'play' && <Player playerState={playerState} />}
