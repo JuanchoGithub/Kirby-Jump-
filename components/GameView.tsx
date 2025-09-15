@@ -58,7 +58,8 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
       isGrounded: false,
       lastCheckpoint: startPos,
       isJumping: false,
-      isFalling: false
+      isFalling: false,
+      groundedOnPlatformId: null,
     };
   };
   
@@ -184,6 +185,15 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     setPlayerState(prev => {
       let { position, velocity, isGrounded, lastCheckpoint } = { ...prev };
       
+      // If player was grounded on a moving platform, move them with it first.
+      if (prev.isGrounded && prev.groundedOnPlatformId) {
+        const delta = platformDeltas.get(prev.groundedOnPlatformId);
+        if (delta) {
+          position.x += delta.x;
+          position.y += delta.y;
+        }
+      }
+      
       const isLeft = activeKeys.has('ArrowLeft');
       const isRight = activeKeys.has('ArrowRight');
       if (isLeft && !isRight) velocity.x = -PLAYER_SPEED;
@@ -197,31 +207,38 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
       velocity.y += GRAVITY;
       const nextPosition = { x: position.x + velocity.x, y: position.y + velocity.y };
 
+      // --- Collision Detection ---
       let onGround = false;
-      let groundedPlatformId: number | null = null;
-      const playerBottom = nextPosition.y + PLAYER_HEIGHT;
+      let finalGroundedPlatform: PlatformData | null = null;
 
+      // Find the highest platform the player would land on in this frame
       for (const platform of updatedPlatforms) {
         const platformTop = platform.position.y;
-        const playerWasAbove = position.y + PLAYER_HEIGHT <= platformTop + 1;
-        if (playerBottom >= platformTop && playerWasAbove && nextPosition.x + PLAYER_WIDTH > platform.position.x && nextPosition.x < platform.position.x + platform.width && velocity.y >= 0) {
-          velocity.y = 0;
-          nextPosition.y = platformTop - PLAYER_HEIGHT;
-          onGround = true;
-          groundedPlatformId = platform.id;
-          break;
+        const playerPrevBottom = position.y + PLAYER_HEIGHT;
+        const playerNextBottom = nextPosition.y + PLAYER_HEIGHT;
+        
+        if (playerPrevBottom <= platformTop + 1 &&
+            playerNextBottom >= platformTop &&
+            velocity.y >= 0 &&
+            nextPosition.x + PLAYER_WIDTH > platform.position.x &&
+            nextPosition.x < platform.position.x + platform.width) {
+          
+          if (finalGroundedPlatform === null || platformTop < finalGroundedPlatform.position.y) {
+            finalGroundedPlatform = platform;
+          }
         }
       }
+
+      let groundedOnPlatformId: number | null = null;
+      if (finalGroundedPlatform) {
+        velocity.y = 0;
+        nextPosition.y = finalGroundedPlatform.position.y - PLAYER_HEIGHT;
+        onGround = true;
+        groundedOnPlatformId = finalGroundedPlatform.id;
+      }
+      
       isGrounded = onGround;
       position = { ...nextPosition };
-      
-      if (isGrounded && groundedPlatformId !== null) {
-          const delta = platformDeltas.get(groundedPlatformId);
-          if (delta) {
-              position.x += delta.x;
-              position.y += delta.y;
-          }
-      }
 
       if (position.x < 0) position.x = 0;
       if (position.x > GAME_WIDTH - PLAYER_WIDTH) position.x = GAME_WIDTH - PLAYER_WIDTH;
@@ -234,6 +251,8 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
           {
               position = { ...lastCheckpoint };
               velocity = { x: 0, y: 0 };
+              isGrounded = false;
+              groundedOnPlatformId = null;
               break;
           }
       }
@@ -241,6 +260,8 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
       if (position.y > LEVEL_HEIGHT_MAX) {
         position = { ...lastCheckpoint };
         velocity = { x: 0, y: 0 };
+        isGrounded = false;
+        groundedOnPlatformId = null;
       }
       
       const victoryCheckpoint = checkpoints.length > 0
@@ -269,7 +290,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
           if(newCamY > cameraY) setCameraY(newCamY);
       }
 
-      return { position, velocity, isGrounded, lastCheckpoint, isJumping: !isGrounded && velocity.y < 0, isFalling: !isGrounded && velocity.y > 0 };
+      return { position, velocity, isGrounded, lastCheckpoint, isJumping: !isGrounded && velocity.y < 0, isFalling: !isGrounded && velocity.y > 0, groundedOnPlatformId };
     });
   }, [cameraY, activeCheckpoints, isFinished, platforms, checkpoints, traps, mode, movingPlatformState]);
 
@@ -278,8 +299,40 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
   const handleToggleMode = () => {
     if (mode === 'play') {
       const { platforms: resetPlatforms, movingState: resetMovingState } = getInitialPlatformState(platforms);
+
+      // Create a map of how much each moving platform was displaced from its starting point.
+      const platformResetDeltas = new Map<number, Vector2D>();
+      platforms.forEach(currentPlatform => {
+          if (currentPlatform.movement) {
+              const resetPlatform = resetPlatforms.find(p => p.id === currentPlatform.id);
+              if (resetPlatform) {
+                  // The delta is the difference required to move from the current position back to the start.
+                  platformResetDeltas.set(currentPlatform.id, {
+                      x: resetPlatform.position.x - currentPlatform.position.x,
+                      y: resetPlatform.position.y - currentPlatform.position.y
+                  });
+              }
+          }
+      });
+
+      // Apply the calculated deltas to any traps attached to those platforms.
+      const resetTraps = traps.map(trap => {
+          if (trap.platformId && platformResetDeltas.has(trap.platformId)) {
+              const delta = platformResetDeltas.get(trap.platformId)!;
+              return {
+                  ...trap,
+                  position: {
+                      x: trap.position.x + delta.x,
+                      y: trap.position.y + delta.y
+                  }
+              };
+          }
+          return trap;
+      });
+      
       setPlatforms(resetPlatforms);
       setMovingPlatformState(resetMovingState);
+      setTraps(resetTraps);
       setMode('edit');
     } else {
       resetGame(false);

@@ -41,6 +41,7 @@ export interface PlayerState {
   lastCheckpoint: Vector2D;
   isJumping: boolean;
   isFalling: boolean;
+  groundedOnPlatformId?: number | null;
 }
 
 export interface LevelData {
