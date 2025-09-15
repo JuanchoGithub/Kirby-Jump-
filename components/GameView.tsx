@@ -279,6 +279,16 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
 
   const handleToggleMode = () => {
     if (mode === 'play') {
+      const newMap = new Map<number, { progress: number; direction: 1 | -1 }>();
+      const updatedPlatforms = platforms.map(p => {
+        if (p.movement) {
+          newMap.set(p.id, { progress: 0, direction: 1 });
+          return { ...p, position: p.movement.path[0] };
+        }
+        return p;
+      });
+      setMovingPlatformState(newMap);
+      setPlatforms(updatedPlatforms);
       setMode('edit');
     } else {
       resetGame(false);
