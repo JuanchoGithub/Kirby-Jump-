@@ -76,7 +76,11 @@ export const Scenery: React.FC<SceneryProps> = ({ id, asset, position, width, he
   // This makes distant objects appear to scroll slower.
   const parallaxY = cameraY * (1 - 1 / depth);
 
-  const wrapperStyle: React.CSSProperties = {};
+  const wrapperStyle: React.CSSProperties = {
+    // Force the element onto its own compositing layer to prevent rendering glitches
+    // in complex, transformed/animated scenes.
+    transform: 'translateZ(0px)',
+  };
   let wrapperClassName = '';
 
   if (asset === 'cloud1' || asset === 'cloud2') {
