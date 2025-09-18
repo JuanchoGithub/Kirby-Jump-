@@ -80,29 +80,58 @@ const Sun: React.FC = () => (
 
 
 const Bird: React.FC = () => (
-    <div className="w-full h-full animate-fly">
-        <div className="absolute w-1/2 h-full border-t-4 border-black origin-bottom-right -rotate-45" />
-        <div className="absolute right-0 w-1/2 h-full border-t-4 border-black origin-bottom-left rotate-45" />
-    </div>
+    <svg viewBox="0 0 40 20" className="w-full h-full text-black" style={{ overflow: 'visible' }} aria-hidden="true">
+        <path 
+            d="M0 10 Q 20 0 40 10" 
+            stroke="currentColor" 
+            strokeWidth="4" 
+            fill="none" 
+            strokeLinecap="round" 
+            className="animate-flap"
+        />
+    </svg>
 );
 
 const Moon: React.FC = () => (
-    <div className="w-full h-full bg-gray-200 rounded-full animate-moon-glow" />
+    <svg viewBox="0 0 100 100" className="w-full h-full" style={{ overflow: 'visible' }} aria-hidden="true">
+        <defs>
+            <radialGradient id="moonGlowGradient">
+                <stop offset="30%" stopColor="rgba(229, 231, 235, 0.4)" />
+                <stop offset="80%" stopColor="rgba(229, 231, 235, 0)" />
+            </radialGradient>
+        </defs>
+        <g className="animate-moon-glow" style={{ transformOrigin: '50% 50%' }}>
+            <circle cx="50" cy="50" r="75" fill="url(#moonGlowGradient)" />
+        </g>
+        <circle cx="50" cy="50" r="50" fill="#e5e7eb" /> {/* gray-200 */}
+    </svg>
 );
 
 const Star: React.FC = () => (
-    <div className="w-full h-full bg-white rounded-full" />
+    <svg viewBox="0 0 20 20" className="w-full h-full" aria-hidden="true">
+        <circle cx="10" cy="10" r="10" fill="white" />
+    </svg>
 );
 
 const Planet: React.FC = () => (
-    <div className="relative w-full h-full flex items-center justify-center">
-        <div className="absolute w-full h-full bg-amber-600 rounded-full" />
-        <div className="absolute w-[160%] h-[20%] border-2 border-amber-300 rounded-full animate-ring-rotate" />
-    </div>
+    <svg viewBox="0 0 100 60" className="w-full h-full" style={{ overflow: 'visible' }} aria-hidden="true">
+        <g className="animate-ring-rotate" style={{ transformOrigin: '50% 50%'}}>
+            <circle cx="50" cy="30" r="28" fill="#d97706" /> {/* amber-600 */}
+            <ellipse cx="50" cy="30" rx="45" ry="10" fill="none" stroke="#fcd34d" strokeWidth="3" /> {/* amber-300 */}
+        </g>
+    </svg>
 );
 
 const ShootingStar: React.FC = () => (
-    <div className="w-24 h-0.5 bg-gradient-to-r from-white/80 to-transparent transform rotate-[135deg]" />
+    <svg viewBox="0 0 100 2" className="w-24 h-0.5" preserveAspectRatio="none" style={{ transform: 'rotate(135deg)', overflow: 'visible' }}>
+        <defs>
+            <linearGradient id="starTailGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="rgba(255, 255, 255, 0.8)" />
+                <stop offset="100%" stopColor="rgba(255, 255, 255, 0)" />
+            </linearGradient>
+        </defs>
+        <line x1="0" y1="1" x2="100" y2="1" stroke="url(#starTailGradient)" strokeWidth="2" />
+    </svg>
 );
 
 
@@ -125,6 +154,11 @@ export const Scenery: React.FC<SceneryProps> = ({ id, asset, position, width, he
   if (asset === 'cloud1' || asset === 'cloud2') {
     wrapperClassName = position.x < GAME_WIDTH / 2 ? 'animate-drift' : 'animate-drift-reverse';
     wrapperStyle.animationDuration = `${15 + (id % 15)}s`;
+  } else if (asset === 'bird') {
+    wrapperClassName = position.x < GAME_WIDTH / 2 ? 'animate-fly-across-right' : 'animate-fly-across-left';
+    wrapperStyle.animationDuration = `${12 + (id % 8)}s`;
+    wrapperStyle.animationDelay = `${(id % 60) / 10}s`;
+    wrapperStyle.animationTimingFunction = 'linear';
   } else if (asset === 'star') {
     wrapperClassName = 'animate-twinkle';
     wrapperStyle.animationDelay = `${(id % 30) / 10}s`;

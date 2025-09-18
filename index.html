@@ -34,8 +34,8 @@
   50% { transform: scale(1.1); opacity: 1; }
 }
 @keyframes moon-glow {
-  0%, 100% { box-shadow: 0 0 30px 5px rgba(229, 231, 235, 0.3); }
-  50% { box-shadow: 0 0 45px 10px rgba(229, 231, 235, 0.4); }
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.15); opacity: 1; }
 }
 @keyframes ring-rotate {
   from { transform: rotate(-30deg) scale(1, 0.95); }
@@ -51,6 +51,24 @@
   90% { opacity: 1; }
   100% { transform: translate(-600px, 300px); opacity: 0; }
 }
+@keyframes flap {
+  0%, 100% { d: path("M0 10 Q 20 0 40 10"); }
+  50% { d: path("M0 10 Q 20 15 40 10"); }
+}
+@keyframes fly-across-right {
+  0% { transform: translate(0, 0) rotate(0); }
+  25% { transform: translate(200px, -30px) rotate(5deg); }
+  50% { transform: translate(400px, 0px) rotate(0); }
+  75% { transform: translate(600px, -30px) rotate(-5deg); }
+  100% { transform: translate(800px, 0px) rotate(0); }
+}
+@keyframes fly-across-left {
+  0% { transform: translate(0, 0) rotate(0); }
+  25% { transform: translate(-200px, -30px) rotate(-5deg); }
+  50% { transform: translate(-400px, 0px) rotate(0); }
+  75% { transform: translate(-600px, 30px) rotate(5deg); }
+  100% { transform: translate(-800px, 0px) rotate(0); }
+}
 .animate-drift { animation: drift ease-in-out infinite; }
 .animate-drift-reverse { animation: drift-reverse ease-in-out infinite; }
 .animate-glow { animation: glow 5s ease-in-out infinite; }
@@ -58,6 +76,9 @@
 .animate-ring-rotate { animation: ring-rotate 4s ease-in-out infinite alternate; }
 .animate-twinkle { animation: twinkle ease-in-out infinite alternate; }
 .animate-shoot { animation: shoot linear infinite; }
+.animate-flap { animation: flap 0.5s ease-in-out infinite; }
+.animate-fly-across-right { animation: fly-across-right linear infinite; }
+.animate-fly-across-left { animation: fly-across-left linear infinite; }
 
 /* Prevent mobile browser gestures like pull-to-refresh */
 html, body {
