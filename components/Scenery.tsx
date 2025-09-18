@@ -25,9 +25,24 @@ const Cloud2: React.FC = () => (
 );
 
 const Hill1: React.FC = () => (
-    <div className="w-full h-full bg-green-400 opacity-80 rounded-t-full" style={{
-        borderTop: '10px solid #2f855a'
-    }}>
+    <div className="w-full h-full opacity-80">
+        <svg 
+            viewBox="0 0 100 100" 
+            preserveAspectRatio="none"
+            className="w-full h-full"
+            aria-hidden="true"
+        >
+            {/* This path creates the darker green "border" by being slightly larger and behind the main fill. */}
+            <path 
+                d="M 0 100 L 0 20 Q 50 -20 100 20 L 100 100 Z"
+                fill="#2f855a" // Darker green, original border color
+            />
+            {/* This path is the main hill color, positioned slightly lower to reveal the "border" path above it. */}
+            <path 
+                d="M 0 100 L 0 24 Q 50 -16 100 24 L 100 100 Z"
+                fill="#4ade80" // Lighter green, original fill color
+            />
+        </svg>
     </div>
 );
 
