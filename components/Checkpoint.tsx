@@ -6,6 +6,7 @@ interface CheckpointProps extends CheckpointData {
   isSelected: boolean;
   isEditable: boolean;
   onMouseDown: (e: React.MouseEvent) => void;
+  onTouchStart: (e: React.TouchEvent) => void;
   isHovered: boolean;
 }
 
@@ -17,7 +18,7 @@ const StarIcon: React.FC<{className?: string; style?: React.CSSProperties}> = ({
 );
 
 
-export const Checkpoint: React.FC<CheckpointProps> = ({ position, width, height, isActive, isSelected, isEditable, onMouseDown, isHovered }) => {
+export const Checkpoint: React.FC<CheckpointProps> = ({ position, width, height, isActive, isSelected, isEditable, onMouseDown, onTouchStart, isHovered }) => {
   const colorClass = isActive ? 'text-yellow-400' : 'text-gray-500';
   const animationClass = isActive ? 'animate-pulse' : 'opacity-60';
   
@@ -44,6 +45,7 @@ export const Checkpoint: React.FC<CheckpointProps> = ({ position, width, height,
         height: height,
       }}
       onMouseDown={isEditable ? onMouseDown : undefined}
+      onTouchStart={isEditable ? onTouchStart : undefined}
     >
       <StarIcon 
         className={`w-full h-full ${colorClass} ${animationClass} transition-colors duration-500`} 

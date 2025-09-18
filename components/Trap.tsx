@@ -5,7 +5,9 @@ interface TrapProps extends TrapData {
   isSelected: boolean;
   isEditable: boolean;
   onMouseDown: (e: React.MouseEvent) => void;
+  onTouchStart: (e: React.TouchEvent) => void;
   onResizeHandleMouseDown: (e: React.MouseEvent, direction: 'left' | 'right') => void;
+  onResizeHandleTouchStart: (e: React.TouchEvent, direction: 'left' | 'right') => void;
   isHovered: boolean;
 }
 
@@ -30,7 +32,7 @@ const assetMap = {
     spikes: Spikes,
 };
 
-export const Trap: React.FC<TrapProps> = ({ type, position, width, height, isSelected, isEditable, onMouseDown, onResizeHandleMouseDown, isHovered }) => {
+export const Trap: React.FC<TrapProps> = ({ type, position, width, height, isSelected, isEditable, onMouseDown, onTouchStart, onResizeHandleMouseDown, onResizeHandleTouchStart, isHovered }) => {
   const getFilter = () => {
     if (isSelected) return 'drop-shadow(0px 0px 8px rgba(239, 68, 68, 0.9))';
     if (isHovered) return 'drop-shadow(0px 0px 8px rgba(255, 255, 255, 0.8))';
@@ -55,6 +57,7 @@ export const Trap: React.FC<TrapProps> = ({ type, position, width, height, isSel
         ...interactionStyle
       }}
       onMouseDown={isEditable ? onMouseDown : undefined}
+      onTouchStart={isEditable ? onTouchStart : undefined}
     >
       <TrapComponent width={width} height={height} />
       {isSelected && (
@@ -62,10 +65,12 @@ export const Trap: React.FC<TrapProps> = ({ type, position, width, height, isSel
           <div 
             className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-red-500 rounded-full border-2 border-white cursor-ew-resize"
             onMouseDown={(e) => onResizeHandleMouseDown(e, 'left')}
+            onTouchStart={(e) => onResizeHandleTouchStart(e, 'left')}
           />
           <div
             className="absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-red-500 rounded-full border-2 border-white cursor-ew-resize"
             onMouseDown={(e) => onResizeHandleMouseDown(e, 'right')}
+            onTouchStart={(e) => onResizeHandleTouchStart(e, 'right')}
           />
         </>
       )}

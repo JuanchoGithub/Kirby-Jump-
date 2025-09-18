@@ -5,11 +5,13 @@ interface PlatformProps extends PlatformData {
   isSelected: boolean;
   isEditable: boolean;
   onMouseDown: (e: React.MouseEvent) => void;
+  onTouchStart: (e: React.TouchEvent) => void;
   onResizeHandleMouseDown: (e: React.MouseEvent, direction: 'left' | 'right') => void;
+  onResizeHandleTouchStart: (e: React.TouchEvent, direction: 'left' | 'right') => void;
   isHovered: boolean;
 }
 
-export const Platform: React.FC<PlatformProps> = ({ position, width, height, isSelected, isEditable, onMouseDown, onResizeHandleMouseDown, isHovered }) => {
+export const Platform: React.FC<PlatformProps> = ({ position, width, height, isSelected, isEditable, onMouseDown, onTouchStart, onResizeHandleMouseDown, onResizeHandleTouchStart, isHovered }) => {
   
   const getBoxShadow = () => {
     if (isSelected) return '0 0 15px 5px rgba(59, 130, 246, 0.7)';
@@ -37,6 +39,7 @@ export const Platform: React.FC<PlatformProps> = ({ position, width, height, isS
         ...interactionStyle
       }}
       onMouseDown={isEditable ? onMouseDown : undefined}
+      onTouchStart={isEditable ? onTouchStart : undefined}
     >
       <div className="absolute w-full h-1 bg-green-400 top-1 rounded-full opacity-50"/>
       {isSelected && (
@@ -44,10 +47,12 @@ export const Platform: React.FC<PlatformProps> = ({ position, width, height, isS
           <div 
             className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-blue-500 rounded-full border-2 border-white cursor-ew-resize"
             onMouseDown={(e) => onResizeHandleMouseDown(e, 'left')}
+            onTouchStart={(e) => onResizeHandleTouchStart(e, 'left')}
           />
           <div
             className="absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-blue-500 rounded-full border-2 border-white cursor-ew-resize"
             onMouseDown={(e) => onResizeHandleMouseDown(e, 'right')}
+            onTouchStart={(e) => onResizeHandleTouchStart(e, 'right')}
           />
         </>
       )}

@@ -199,10 +199,10 @@ export const LevelSelect: React.FC<LevelSelectProps> = ({ onPlayLevel, onEditLev
     };
 
     return (
-        <div className="w-full max-w-2xl bg-gray-800 bg-opacity-70 p-8 rounded-2xl shadow-2xl text-white">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-4xl font-bold">My Levels</h1>
-                <div className="flex gap-4">
+        <div className="w-full max-w-2xl bg-gray-800 bg-opacity-70 p-4 sm:p-8 rounded-2xl shadow-2xl text-white">
+            <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+                <h1 className="text-3xl sm:text-4xl font-bold">My Levels</h1>
+                <div className="flex gap-2 sm:gap-4">
                     {/* FIX: Changed ref callback to use a block body to prevent an implicit return value, which was causing a TypeScript error. */}
                     <button ref={(el) => { itemRefs.current[0] = el; }} onClick={() => focusableItems[0].action()} className={`px-4 py-2 bg-indigo-600 rounded-lg hover:bg-indigo-500 transition-colors ${focusedIndex === 0 ? 'ring-2 ring-yellow-400' : ''}`}>
                         Import

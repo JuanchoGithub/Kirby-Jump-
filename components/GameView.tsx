@@ -1,10 +1,11 @@
-import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useEffect, useLayoutEffect } from 'react';
 import { Player } from './Player';
 import { Platform } from './Platform';
 import { Checkpoint } from './Checkpoint';
 import { Trap } from './Trap';
 import { Scenery } from './Scenery';
 import { EditorSidebar } from './EditorSidebar';
+import { OnScreenControls, OnScreenControlsState } from './OnScreenControls';
 import { useGameLoop } from '../hooks/useGameLoop';
 import { useKeyboardInput } from '../hooks/useKeyboardInput';
 import { useGamepadInput } from '../hooks/useGamepadInput';
@@ -28,6 +29,7 @@ const THEMES: Theme[] = ['day', 'afternoon', 'night', 'twilight'];
 export type EditorTool = 'select' | 'add-platform' | 'add-checkpoint' | 'add-trap';
 const EDITOR_TOOLS: EditorTool[] = ['select', 'add-platform', 'add-checkpoint', 'add-trap'];
 
+const EditIcon = () => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
 
 interface GameViewProps {
   levelData: LevelData;
@@ -86,6 +88,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
   const [selectedObjectId, setSelectedObjectId] = useState<number | null>(null);
   const [hoveredObjectId, setHoveredObjectId] = useState<number | null>(null);
   const [isSidebarFocused, setIsSidebarFocused] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [activeTool, setActiveTool] = useState<EditorTool>('select');
   const [editorCursor, setEditorCursor] = useState<{pos: Vector2D, visible: boolean}>({ pos: {x: 0, y: 0}, visible: false });
@@ -94,8 +97,12 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [exitConfirmFocusIndex, setExitConfirmFocusIndex] = useState(0);
   const [isEditingPath, setIsEditingPath] = useState(false);
+  const [scale, setScale] = useState(1);
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+  const [onScreenControls, setOnScreenControls] = useState<OnScreenControlsState>({ left: false, right: false, jump: false });
 
   const dpadSpeedChangeState = useRef({ startTime: 0, direction: 0, lastTick: 0 });
+  const prevOnScreenControls = useRef(onScreenControls);
   
   const editorAction = useRef<{
     type: 'move' | 'resize-left' | 'resize-right' | 'move-path-end',
@@ -116,8 +123,24 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
   const gamepadState = useGamepadInput();
   const prevGamepadState = useRef(gamepadState);
   const gameAreaRef = useRef<HTMLDivElement>(null);
+  const gameContainerRef = useRef<HTMLDivElement>(null);
 
-  // FIX: Moved handleSave, resetGame, handleToggleMode, handleConfirmExit, and handleUpdatePlatform before their usage to fix "used before declaration" errors.
+  useEffect(() => {
+      setIsTouchDevice('ontouchstart' in window || navigator.maxTouchPoints > 0);
+  }, []);
+
+  useLayoutEffect(() => {
+    const calculateScale = () => {
+        if (!gameContainerRef.current) return;
+        const { width, height } = gameContainerRef.current.getBoundingClientRect();
+        const newScale = Math.min(width / GAME_WIDTH, height / GAME_HEIGHT) * 0.95; // 0.95 for padding
+        setScale(newScale);
+    };
+    calculateScale();
+    window.addEventListener('resize', calculateScale);
+    return () => window.removeEventListener('resize', calculateScale);
+  }, []);
+
   const handleSave = useCallback((showAlert = true) => {
     const trimmedName = levelName.trim(); if (!trimmedName) { if(showAlert) alert("Level name cannot be empty."); return; }
     const existingLevels = getLevels();
@@ -257,7 +280,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
 
     // --- High-Priority Actions & State Transitions ---
     if (startButtonPressed) { handleRequestTestLevel(); return; }
-    if (viewButtonPressed) { setIsSidebarFocused(true); return; }
+    if (viewButtonPressed) { setIsSidebarFocused(true); setIsSidebarOpen(true); return; }
     if (bButtonPressed) { setSelectedObjectId(null); }
     if (yButtonPressed) {
         const currentIndex = THEMES.indexOf(theme);
@@ -416,13 +439,17 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
       }
       const playerMovementDeadzone = 0.75;
       const leftStickX = gamepadState.axes[0] || 0;
-      const isLeft = activeKeys.has('ArrowLeft') || leftStickX < -playerMovementDeadzone;
-      const isRight = activeKeys.has('ArrowRight') || leftStickX > playerMovementDeadzone;
+      const isLeft = activeKeys.has('ArrowLeft') || leftStickX < -playerMovementDeadzone || onScreenControls.left;
+      const isRight = activeKeys.has('ArrowRight') || leftStickX > playerMovementDeadzone || onScreenControls.right;
+
       if (isLeft && !isRight) velocity.x = -PLAYER_SPEED;
       else if (isRight && !isLeft) velocity.x = PLAYER_SPEED;
       else velocity.x = 0;
+      
       const jumpPressed = activeKeys.has('ArrowUp') || (gamepadState.buttons[0]?.pressed);
-      if (jumpPressed && isGrounded) velocity.y = JUMP_STRENGTH;
+      const onScreenJumpPressed = !prevOnScreenControls.current.jump && onScreenControls.jump;
+
+      if ((jumpPressed || onScreenJumpPressed) && isGrounded) velocity.y = JUMP_STRENGTH;
       velocity.y += GRAVITY;
       const nextPosition = { x: position.x + velocity.x, y: position.y + velocity.y };
       let finalGroundedPlatform: PlatformData | null = null;
@@ -466,7 +493,8 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
       return { position, velocity, isGrounded, lastCheckpoint, isJumping: !isGrounded && velocity.y < 0, isFalling: !isGrounded && velocity.y > 0, groundedOnPlatformId };
     });
     prevGamepadState.current = gamepadState;
-  }, [cameraY, activeCheckpoints, isFinished, platforms, checkpoints, traps, mode, movingPlatformState, gamepadState, handleEditorGamepadInput, editorCursor.pos, selectedObjectId, activeTool, hoveredObjectId]);
+    prevOnScreenControls.current = onScreenControls;
+  }, [cameraY, activeCheckpoints, isFinished, platforms, checkpoints, traps, mode, movingPlatformState, gamepadState, handleEditorGamepadInput, editorCursor.pos, selectedObjectId, activeTool, hoveredObjectId, onScreenControls]);
 
   useGameLoop(gameTick, isFinished || showTestConfirm || showExitConfirm || (mode === 'edit' && isSidebarFocused));
   
@@ -482,10 +510,8 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
   useEffect(() => {
     if (mode !== 'edit' || isSidebarFocused) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't interfere with text input fields
       if (document.activeElement?.tagName === 'INPUT') return;
-      
-      if (e.key === 'Delete') {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
         handleDeleteSelected();
       }
     };
@@ -494,16 +520,11 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
   }, [mode, isSidebarFocused, handleDeleteSelected]);
 
   useEffect(() => {
-    // This effect handles controller input specifically for the "You Win" screen.
     if (!isFinished) return;
-
     const aButtonPressed = gamepadState.buttons[0]?.pressed && !prevGamepadState.current.buttons[0]?.pressed;
-
     if (aButtonPressed) {
         resetGame(initialMode === 'play');
     }
-
-    // This is crucial because the main game loop is paused and isn't updating the prev state.
     prevGamepadState.current = gamepadState;
   }, [isFinished, gamepadState, resetGame, initialMode]);
 
@@ -541,13 +562,22 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     setConfirmFocusIndex(0);
   };
 
-  const getMousePos = (e: React.MouseEvent): Vector2D => {
+  const getEventPosition = (e: React.MouseEvent | React.TouchEvent): Vector2D => {
+    const touch = 'touches' in e ? e.touches[0] : null;
+    const clientX = touch ? touch.clientX : (e as React.MouseEvent).clientX;
+    const clientY = touch ? touch.clientY : (e as React.MouseEvent).clientY;
+
     if (!gameAreaRef.current) return { x: 0, y: 0 };
     const rect = gameAreaRef.current.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top + cameraY };
+    
+    // Adjust for scaling
+    const x = (clientX - rect.left) / scale;
+    const y = (clientY - rect.top) / scale;
+
+    return { x, y: y + cameraY };
   };
   
-  const handleEditorMouseDown = (e: React.MouseEvent, objectId: number, type: 'platform' | 'checkpoint' | 'trap', handle?: 'left' | 'right' | 'move-path-end') => {
+  const handleEditorInteractionStart = (e: React.MouseEvent | React.TouchEvent, objectId: number, type: 'platform' | 'checkpoint' | 'trap', handle?: 'left' | 'right' | 'move-path-end') => {
     e.stopPropagation();
     setActiveTool('select');
     setSelectedObjectId(objectId);
@@ -559,11 +589,12 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
         attachedTrapsInfo = traps.filter(t => t.platformId === (originalObject as PlatformData).id).map(t => ({ trapId: t.id, offset: { x: t.position.x - originalObject.position.x, y: t.position.y - originalObject.position.y } }));
     }
     const actionType = handle ? (handle === 'left' ? 'resize-left' : handle === 'right' ? 'resize-right' : handle) : 'move';
-    editorAction.current = { type: actionType, objectId, startPos: getMousePos(e), originalObject, attachedTraps: attachedTrapsInfo };
+    editorAction.current = { type: actionType, objectId, startPos: getEventPosition(e), originalObject, attachedTraps: attachedTrapsInfo };
   };
 
-  const handleEditorMouseMove = (e: React.MouseEvent) => {
-    const currentPos = getMousePos(e);
+  const handleEditorInteractionMove = (e: React.MouseEvent | React.TouchEvent) => {
+    if ('touches' in e) { e.preventDefault(); }
+    const currentPos = getEventPosition(e);
     setEditorCursor({ pos: currentPos, visible: true });
     if (!editorAction.current) return;
     const { type, startPos, objectId, originalObject } = editorAction.current;
@@ -573,9 +604,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
         const platform = originalObject as PlatformData;
         const newPos = { x: platform.position.x + delta.x, y: platform.position.y + delta.y };
         const newMovement = platform.movement ? { ...platform.movement, path: [newPos, { x: platform.movement.path[1].x + delta.x, y: platform.movement.path[1].y + delta.y }] as [Vector2D, Vector2D] } : undefined;
-        
         setPlatforms(prev => prev.map(p => p.id === objectId ? { ...p, position: newPos, movement: newMovement } : p));
-        
         if(editorAction.current?.attachedTraps?.length) {
             setTraps(prevTraps => {
                 const nextTraps = [...prevTraps];
@@ -614,7 +643,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     }
   };
 
-  const handleEditorMouseUp = (e: React.MouseEvent) => {
+  const handleEditorInteractionEnd = () => {
     if (!editorAction.current) return;
     const { type, objectId } = editorAction.current;
     
@@ -646,11 +675,9 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
 
   const handleWheel = (e: React.WheelEvent) => {
     if (mode !== 'edit' || isSidebarFocused) return;
-    
     if (e.shiftKey && selectedObjectId !== null && selectedObjectData && (selectedObjectData.type === 'platform' || selectedObjectData.type === 'trap')) {
         e.preventDefault();
         const resizeAmount = e.deltaY > 0 ? -GRID_SIZE : GRID_SIZE;
-        
         if (selectedObjectData.type === 'platform') {
             setPlatforms(prev => prev.map(p => p.id === selectedObjectId && p.width + resizeAmount >= GRID_SIZE * 2 ? { ...p, width: p.width + resizeAmount } : p));
         } else if (selectedObjectData.type === 'trap') {
@@ -658,7 +685,6 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
         }
         return;
     }
-
     setCameraY(y => Math.max(0, Math.min(y + e.deltaY, LEVEL_HEIGHT_MAX - GAME_HEIGHT)));
   };
 
@@ -707,18 +733,19 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
   
   const levelContainerStyle = { height: LEVEL_HEIGHT_MAX, transform: `translateY(${-cameraY}px)`, ...gridPattern };
   const gameViewportStyle: React.CSSProperties = {
-    width: GAME_WIDTH, height: GAME_HEIGHT, perspective: '1000px', cursor: (mode === 'edit' && !isSidebarFocused) ? 'none' : 'auto',
+    width: GAME_WIDTH, height: GAME_HEIGHT, perspective: '1000px', cursor: (mode === 'edit' && !isSidebarFocused && !isTouchDevice) ? 'none' : 'auto',
     ...(theme === 'twilight' && { backgroundImage: 'linear-gradient(to bottom, #0f172a, #1e3a8a, #3c5a99, #60a5fa, #a690c8, #fb923c, #fcd34d)', backgroundSize: `100% ${LEVEL_HEIGHT_MAX}px`, backgroundRepeat: 'no-repeat', backgroundPosition: `0px ${-cameraY}px`, }),
   };
 
   const renderEditorCursor = () => {
-    if (mode !== 'edit' || !editorCursor.visible || isSidebarFocused) return null;
+    if (mode !== 'edit' || !editorCursor.visible || isSidebarFocused || isTouchDevice) return null;
     let cursorElement = null;
     const ghostStyle = { opacity: 0.5 };
     switch(activeTool) {
-        case 'add-platform': cursorElement = <div style={ghostStyle}><Platform id={-1} position={{x: snapToGrid(editorCursor.pos.x - 75), y: snapToGrid(editorCursor.pos.y - 10)}} width={150} height={20} isSelected={false} isEditable={false} onMouseDown={()=>{}} onResizeHandleMouseDown={()=>{}} isHovered={false}/></div>; break;
-        case 'add-checkpoint': cursorElement = <div style={ghostStyle}><Checkpoint id={-1} position={{x: snapToGrid(editorCursor.pos.x - 20), y: snapToGrid(editorCursor.pos.y - 20)}} width={40} height={40} isActive={false} isSelected={false} isEditable={false} onMouseDown={()=>{}} isHovered={false}/></div>; break;
-        case 'add-trap': cursorElement = <div style={ghostStyle}><Trap id={-1} type="spikes" position={{x: snapToGrid(editorCursor.pos.x - 40), y: snapToGrid(editorCursor.pos.y - 10)}} width={80} height={20} isSelected={false} isEditable={false} onMouseDown={()=>{}} onResizeHandleMouseDown={()=>{}} isHovered={false}/></div>; break;
+// FIX: Added missing onTouchStart and onResizeHandleTouchStart props to ghost components.
+        case 'add-platform': cursorElement = <div style={ghostStyle}><Platform id={-1} position={{x: snapToGrid(editorCursor.pos.x - 75), y: snapToGrid(editorCursor.pos.y - 10)}} width={150} height={20} isSelected={false} isEditable={false} onMouseDown={()=>{}} onTouchStart={() => {}} onResizeHandleMouseDown={()=>{}} onResizeHandleTouchStart={() => {}} isHovered={false}/></div>; break;
+        case 'add-checkpoint': cursorElement = <div style={ghostStyle}><Checkpoint id={-1} position={{x: snapToGrid(editorCursor.pos.x - 20), y: snapToGrid(editorCursor.pos.y - 20)}} width={40} height={40} isActive={false} isSelected={false} isEditable={false} onMouseDown={()=>{}} onTouchStart={() => {}} isHovered={false}/></div>; break;
+        case 'add-trap': cursorElement = <div style={ghostStyle}><Trap id={-1} type="spikes" position={{x: snapToGrid(editorCursor.pos.x - 40), y: snapToGrid(editorCursor.pos.y - 10)}} width={80} height={20} isSelected={false} isEditable={false} onMouseDown={()=>{}} onTouchStart={() => {}} onResizeHandleMouseDown={()=>{}} onResizeHandleTouchStart={() => {}} isHovered={false}/></div>; break;
         default: cursorElement = <div className="absolute w-6 h-6 -translate-x-1/2 -translate-y-1/2 border-2 border-white rounded-full pointer-events-none" style={{ left: editorCursor.pos.x, top: editorCursor.pos.y, zIndex: 200 }}><div className="w-1.5 h-1.5 bg-white rounded-full absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"/></div>;
     }
     return <div className="absolute top-0 left-0 pointer-events-none" style={{transform: `translateY(${-cameraY}px)`, zIndex: 150}}>{cursorElement}</div>
@@ -759,84 +786,129 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
         </div>
     );
   };
+  
+  const handleGameAreaInteractionStart = (e: React.MouseEvent | React.TouchEvent) => {
+    if (e.target === e.currentTarget) handleEditorInteraction(getEventPosition(e));
+  }
+  
+  const handleGameAreaInteractionMove = (e: React.MouseEvent | React.TouchEvent) => {
+      if (mode === 'edit') handleEditorInteractionMove(e);
+  }
+  
+  const handleGameAreaInteractionEnd = (e: React.MouseEvent | React.TouchEvent) => {
+      if (mode === 'edit') handleEditorInteractionEnd();
+  }
 
   return (
-    <div className="flex flex-row items-start justify-center gap-4">
-      <div className="flex flex-col items-center">
-        {mode === 'play' && (
-           <div style={{width: GAME_WIDTH}} className="p-2 mb-2 bg-gray-800 rounded-lg shadow-lg flex items-center justify-between gap-2">
-                <button onClick={() => setShowExitConfirm(true)} className="px-3 py-2 rounded-lg transition-colors text-white text-sm bg-gray-700 hover:bg-gray-600">{'< Back'}</button>
-                <h1 className="text-lg font-bold text-white hidden sm:block">{levelName}</h1>
-                <button onClick={handleToggleMode} className="px-3 py-2 rounded-lg transition-colors text-white text-sm bg-gray-700 hover:bg-gray-600">Edit</button>
-            </div>
-        )}
-        <div 
-            className={`relative rounded-2xl shadow-2xl overflow-hidden border-8 border-gray-700 ${theme === 'twilight' ? '' : THEME_CONFIG[theme].bg}`}
-            style={gameViewportStyle}
-            onWheel={handleWheel}
-            onMouseMove={mode === 'edit' ? handleEditorMouseMove : undefined}
-            onMouseLeave={mode === 'edit' ? () => setEditorCursor(c => ({...c, visible: false})) : undefined}
-            onMouseUp={mode === 'edit' ? handleEditorMouseUp : undefined}
-            ref={gameAreaRef}
-        >
-            <div 
-                className="absolute top-0 left-0 w-full" 
-                style={levelContainerStyle}
-                onMouseDown={mode === 'edit' ? (e) => { if(e.target === e.currentTarget) handleEditorInteraction(getMousePos(e)) } : undefined}
+    <div className="w-full h-full flex flex-col lg:flex-row items-center justify-center relative">
+      <div ref={gameContainerRef} className="flex-grow w-full h-full flex justify-center items-center p-2 lg:p-4">
+        <div style={{ transform: `scale(${scale})` }}>
+            <div
+                className={`relative rounded-2xl shadow-2xl overflow-hidden border-8 border-gray-700 ${theme === 'twilight' ? '' : THEME_CONFIG[theme].bg}`}
+                style={gameViewportStyle}
+                onWheel={handleWheel}
+                onMouseMove={handleGameAreaInteractionMove}
+                onMouseLeave={mode === 'edit' ? () => setEditorCursor(c => ({...c, visible: false})) : undefined}
+                onMouseUp={handleGameAreaInteractionEnd}
+                onTouchMove={handleGameAreaInteractionMove}
+                onTouchEnd={handleGameAreaInteractionEnd}
             >
-                {THEME_CONFIG[theme].scenery.map(scenery => <Scenery key={scenery.id} {...scenery} cameraY={cameraY} />)}
-                {platforms.map(platform => <Platform key={platform.id} {...platform} isSelected={mode === 'edit' && selectedObjectId === platform.id} isEditable={mode === 'edit'} onMouseDown={(e) => handleEditorMouseDown(e, platform.id, 'platform')} onResizeHandleMouseDown={(e, dir) => handleEditorMouseDown(e, platform.id, 'platform', dir)} isHovered={hoveredObjectId === platform.id} />)}
-                {checkpoints.map(checkpoint => <Checkpoint key={checkpoint.id} {...checkpoint} isActive={activeCheckpoints.has(checkpoint.id)} isSelected={mode === 'edit' && selectedObjectId === checkpoint.id} isEditable={mode === 'edit'} onMouseDown={(e) => handleEditorMouseDown(e, checkpoint.id, 'checkpoint')} isHovered={hoveredObjectId === checkpoint.id} />)}
-                {traps.map(trap => <Trap key={trap.id} {...trap} isSelected={mode === 'edit' && selectedObjectId === trap.id} isEditable={mode === 'edit'} onMouseDown={(e) => handleEditorMouseDown(e, trap.id, 'trap')} onResizeHandleMouseDown={(e, dir) => handleEditorMouseDown(e, trap.id, 'trap', dir)} isHovered={hoveredObjectId === trap.id} />)}
-                {mode === 'edit' && platforms.map(p => {
-                    if (!p.movement || (selectedObjectId !== p.id && !(isEditingPath && selectedObjectId === p.id))) return null;
-                    const [start, end] = p.movement.path;
-                    return (
-                        <React.Fragment key={`path-overlay-${p.id}`}>
-                            <svg className="absolute top-0 left-0 w-full h-full overflow-visible pointer-events-none" style={{ zIndex: 100 }}>
-                                <line x1={start.x + p.width/2} y1={start.y + p.height/2} x2={end.x + p.width/2} y2={end.y + p.height/2} stroke="rgba(255, 255, 100, 0.7)" strokeWidth="2" strokeDasharray="6,6" />
-                            </svg>
-                            <div className="absolute w-4 h-4 bg-yellow-400 rounded-full border-2 border-white cursor-pointer" style={{ left: end.x + p.width/2 - 8, top: end.y + p.height/2 - 8, zIndex: 101 }} onMouseDown={(e) => handleEditorMouseDown(e, p.id, 'platform', 'move-path-end')} />
-                        </React.Fragment>
-                    )
-                })}
-                {mode === 'play' && <Player playerState={playerState} />}
+                <div 
+                    ref={gameAreaRef}
+                    className="absolute top-0 left-0 w-full" 
+                    style={{ height: GAME_HEIGHT, transform: `scale(${1/scale})`, transformOrigin: 'top left' }}
+                />
+                <div 
+                    className="absolute top-0 left-0 w-full" 
+                    style={levelContainerStyle}
+                    onMouseDown={handleGameAreaInteractionStart}
+                    onTouchStart={handleGameAreaInteractionStart}
+                >
+                    {THEME_CONFIG[theme].scenery.map(scenery => <Scenery key={scenery.id} {...scenery} cameraY={cameraY} />)}
+                    {platforms.map(platform => <Platform key={platform.id} {...platform} isSelected={mode === 'edit' && selectedObjectId === platform.id} isEditable={mode === 'edit'} onMouseDown={(e) => handleEditorInteractionStart(e, platform.id, 'platform')} onTouchStart={(e) => handleEditorInteractionStart(e, platform.id, 'platform')} onResizeHandleMouseDown={(e, dir) => handleEditorInteractionStart(e, platform.id, 'platform', dir)} onResizeHandleTouchStart={(e, dir) => handleEditorInteractionStart(e, platform.id, 'platform', dir)} isHovered={hoveredObjectId === platform.id} />)}
+                    {checkpoints.map(checkpoint => <Checkpoint key={checkpoint.id} {...checkpoint} isActive={activeCheckpoints.has(checkpoint.id)} isSelected={mode === 'edit' && selectedObjectId === checkpoint.id} isEditable={mode === 'edit'} onMouseDown={(e) => handleEditorInteractionStart(e, checkpoint.id, 'checkpoint')} onTouchStart={(e) => handleEditorInteractionStart(e, checkpoint.id, 'checkpoint')} isHovered={hoveredObjectId === checkpoint.id} />)}
+                    {traps.map(trap => <Trap key={trap.id} {...trap} isSelected={mode === 'edit' && selectedObjectId === trap.id} isEditable={mode === 'edit'} onMouseDown={(e) => handleEditorInteractionStart(e, trap.id, 'trap')} onTouchStart={(e) => handleEditorInteractionStart(e, trap.id, 'trap')} onResizeHandleMouseDown={(e, dir) => handleEditorInteractionStart(e, trap.id, 'trap', dir)} onResizeHandleTouchStart={(e, dir) => handleEditorInteractionStart(e, trap.id, 'trap', dir)} isHovered={hoveredObjectId === trap.id} />)}
+                    {mode === 'edit' && platforms.map(p => {
+                        if (!p.movement || (selectedObjectId !== p.id && !(isEditingPath && selectedObjectId === p.id))) return null;
+                        const [start, end] = p.movement.path;
+                        return (
+                            <React.Fragment key={`path-overlay-${p.id}`}>
+                                <svg className="absolute top-0 left-0 w-full h-full overflow-visible pointer-events-none" style={{ zIndex: 100 }}>
+                                    <line x1={start.x + p.width/2} y1={start.y + p.height/2} x2={end.x + p.width/2} y2={end.y + p.height/2} stroke="rgba(255, 255, 100, 0.7)" strokeWidth="2" strokeDasharray="6,6" />
+                                </svg>
+                                <div className="absolute w-4 h-4 bg-yellow-400 rounded-full border-2 border-white cursor-pointer" style={{ left: end.x + p.width/2 - 8, top: end.y + p.height/2 - 8, zIndex: 101 }} onMouseDown={(e) => handleEditorInteractionStart(e, p.id, 'platform', 'move-path-end')} onTouchStart={(e) => handleEditorInteractionStart(e, p.id, 'platform', 'move-path-end')} />
+                            </React.Fragment>
+                        )
+                    })}
+                    {mode === 'play' && <Player playerState={playerState} />}
+                </div>
+                {renderEditorCursor()}
+                {renderConfirmDialog()}
+                {renderExitConfirmDialog()}
+                {isFinished && (
+                <div className="absolute inset-0 bg-black bg-opacity-50 flex flex-col justify-center items-center z-50">
+                    <h1 className="text-4xl sm:text-6xl font-bold text-white mb-4" style={{textShadow: '2px 2px 4px rgba(0,0,0,0.5)'}}>You Win!</h1>
+                    <p className="text-lg sm:text-2xl text-white mb-8">Congratulations!</p>
+                    <button onClick={() => resetGame(initialMode === 'play')} className="px-6 py-3 bg-yellow-400 text-black font-bold rounded-lg shadow-lg hover:bg-yellow-500 transition-colors ring-2 ring-yellow-300 ring-offset-4 ring-offset-black">Play Again</button>
+                </div>
+                )}
             </div>
-            {renderEditorCursor()}
-            {renderConfirmDialog()}
-            {renderExitConfirmDialog()}
-            {isFinished && (
-            <div className="absolute inset-0 bg-black bg-opacity-50 flex flex-col justify-center items-center z-50">
-                <h1 className="text-6xl font-bold text-white mb-4" style={{textShadow: '2px 2px 4px rgba(0,0,0,0.5)'}}>You Win!</h1>
-                <p className="text-2xl text-white mb-8">Congratulations!</p>
-                <button onClick={() => resetGame(initialMode === 'play')} className="px-6 py-3 bg-yellow-400 text-black font-bold rounded-lg shadow-lg hover:bg-yellow-500 transition-colors ring-2 ring-yellow-300 ring-offset-4 ring-offset-black">Play Again</button>
-            </div>
-            )}
         </div>
       </div>
       
+      {mode === 'play' && (
+        <div style={{width: GAME_WIDTH * scale}} className={`absolute top-2 left-1/2 -translate-x-1/2 p-2 bg-gray-800 rounded-lg shadow-lg flex items-center justify-between gap-2 z-20`}>
+              <button onClick={() => setShowExitConfirm(true)} className="px-3 py-2 rounded-lg transition-colors text-white text-sm bg-gray-700 hover:bg-gray-600">{'< Back'}</button>
+              <h1 className="text-lg font-bold text-white hidden sm:block truncate">{levelName}</h1>
+              <button onClick={handleToggleMode} className="px-3 py-2 rounded-lg transition-colors text-white text-sm bg-gray-700 hover:bg-gray-600">Edit</button>
+        </div>
+      )}
+      
+      {mode === 'play' && isTouchDevice && <OnScreenControls onChange={setOnScreenControls} />}
+
       {mode === 'edit' && (
-        <EditorSidebar
-            theme={theme}
-            onSetTheme={onSetTheme}
-            onDeleteSelected={handleDeleteSelected}
-            isObjectSelected={selectedObjectId !== null}
-            onSave={() => handleSave()}
-            onExport={handleExport}
-            onExit={onExit}
-            onRequestTestLevel={handleRequestTestLevel}
-            levelName={levelName}
-            onLevelNameChange={setLevelName}
-            saveStatus={saveStatus}
-            selectedObject={selectedObjectData?.type === 'platform' ? selectedObjectData : null}
-            onUpdatePlatform={handleUpdatePlatform}
-            activeTool={activeTool}
-            onSetTool={setActiveTool}
-            gamepadState={gamepadState}
-            prevGamepadState={prevGamepadState.current}
-            isSidebarFocused={isSidebarFocused}
-            onSetIsSidebarFocused={setIsSidebarFocused}
-        />
+        <>
+            <button 
+                onClick={() => setIsSidebarOpen(true)}
+                className={`lg:hidden fixed bottom-4 right-4 z-40 bg-blue-600 hover:bg-blue-500 text-white p-3 rounded-full shadow-lg transition-opacity ${isSidebarOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+                aria-label="Open Editor Sidebar"
+            >
+                <div className="w-6 h-6"><EditIcon/></div>
+            </button>
+
+            {isSidebarOpen && <div onClick={() => setIsSidebarOpen(false)} className="lg:hidden fixed inset-0 bg-black/50 z-20" />}
+            
+            <div className={`
+                h-full transition-transform duration-300 ease-in-out bg-gray-800
+                fixed top-0 right-0 w-full max-w-xs sm:w-72 z-30
+                ${isSidebarOpen ? 'translate-x-0 shadow-2xl' : 'translate-x-full'}
+                lg:relative lg:translate-x-0 lg:shadow-none lg:w-72 lg:h-auto lg:flex-shrink-0
+            `}>
+                <EditorSidebar
+                    theme={theme}
+// FIX: Changed `setTheme` to `onSetTheme` to match the prop name passed to GameView.
+                    onSetTheme={onSetTheme}
+                    onDeleteSelected={handleDeleteSelected}
+                    isObjectSelected={selectedObjectId !== null}
+                    onSave={() => handleSave()}
+                    onExport={handleExport}
+                    onExit={onExit}
+                    onRequestTestLevel={handleRequestTestLevel}
+                    levelName={levelName}
+                    onLevelNameChange={setLevelName}
+                    saveStatus={saveStatus}
+                    selectedObject={selectedObjectData?.type === 'platform' ? selectedObjectData : null}
+                    onUpdatePlatform={handleUpdatePlatform}
+                    activeTool={activeTool}
+                    onSetTool={setActiveTool}
+                    gamepadState={gamepadState}
+                    prevGamepadState={prevGamepadState.current}
+                    isSidebarFocused={isSidebarFocused}
+                    onSetIsSidebarFocused={setIsSidebarFocused}
+                    onClose={() => setIsSidebarOpen(false)}
+                />
+            </div>
+        </>
       )}
     </div>
   );

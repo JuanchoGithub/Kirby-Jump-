@@ -23,6 +23,7 @@ interface EditorSidebarProps {
     prevGamepadState: GamepadState;
     isSidebarFocused: boolean;
     onSetIsSidebarFocused: (isFocused: boolean) => void;
+    onClose: () => void;
 }
 
 // --- SVG Icons for Tools ---
@@ -35,6 +36,8 @@ const TestIcon = () => <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 
 const SaveIcon = () => <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" /></svg>;
 const ExitIcon = () => <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z" /></svg>;
 const ExportIcon = () => <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+const CloseIcon = () => <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>;
+
 
 const SidebarSection: React.FC<{title?: string, children: React.ReactNode, className?: string}> = ({ title, children, className }) => (
     <div className={`flex flex-col gap-2 border-t border-gray-700 pt-3 ${className}`}>
@@ -82,7 +85,7 @@ const ControlHelp: React.FC<{ button: string | React.ReactNode, action: string }
 export const EditorSidebar: React.FC<EditorSidebarProps> = ({ 
   theme, onSetTheme, onDeleteSelected, isObjectSelected, onSave, onExport, onExit, onRequestTestLevel,
   levelName, onLevelNameChange, saveStatus, selectedObject, onUpdatePlatform,
-  activeTool, onSetTool, gamepadState, prevGamepadState, isSidebarFocused, onSetIsSidebarFocused
+  activeTool, onSetTool, gamepadState, prevGamepadState, isSidebarFocused, onSetIsSidebarFocused, onClose,
 }) => {
     const platform = selectedObject?.data;
     const isMoving = !!platform?.movement;
@@ -141,9 +144,12 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
             if (item && !item.disabled) item.action();
         }
         
-        if (bButtonPressed || viewButtonPressed) onSetIsSidebarFocused(false);
+        if (bButtonPressed || viewButtonPressed) {
+            onSetIsSidebarFocused(false);
+            onClose();
+        }
 
-    }, [isSidebarFocused, gamepadState, prevGamepadState, focusableItems, focusedIndex, onSetIsSidebarFocused]);
+    }, [isSidebarFocused, gamepadState, prevGamepadState, focusableItems, focusedIndex, onSetIsSidebarFocused, onClose]);
 
 
     const handleToggleMovement = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -197,19 +203,23 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                 <ControlHelp button="Start" action="Test Level" />
                 <ControlHelp button="View" action="Focus Sidebar" />
 
-                <div className="text-center text-xs font-bold text-gray-500 mt-3 mb-1">Mouse & Keyboard</div>
-                <ControlHelp button="Click" action="Place / Select" />
+                <div className="text-center text-xs font-bold text-gray-500 mt-3 mb-1">Touch / Mouse</div>
+                <ControlHelp button="Tap/Click" action="Place / Select" />
                 <ControlHelp button="Drag" action="Move / Resize" />
-                <ControlHelp button="Wheel" action="Pan View Up/Down" />
-                {isObjectSelected && ( <ControlHelp button="Shift+Wheel" action="Resize Width" /> )}
+                <ControlHelp button="Wheel/Pinch" action="Pan/Zoom View" />
                 <ControlHelp button="Delete" action="Delete Selected" />
             </>
         )
     };
 
     return (
-        <div className="w-72 bg-gray-800 text-white rounded-lg shadow-2xl p-4 flex flex-col gap-3 h-[816px] overflow-y-auto">
-            <h2 className="text-2xl font-bold text-white text-center pb-2">Editor</h2>
+        <div className="w-full bg-gray-800 text-white p-4 flex flex-col gap-3 h-full overflow-y-auto">
+            <div className="flex justify-between items-center pb-2">
+                <h2 className="text-2xl font-bold text-white text-center">Editor</h2>
+                <button onClick={onClose} className="lg:hidden p-1 text-gray-400 hover:text-white">
+                    <CloseIcon />
+                </button>
+            </div>
              
             <SidebarSection className="border-t-0 pt-0">
                 <div className="grid grid-cols-2 gap-2">
@@ -272,7 +282,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
             </SidebarSection>
             
             <SidebarSection title="Theme">
-                <div className="grid grid-cols-4 gap-2 text-sm">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
                     <button onClick={() => onSetTheme('day')} className={`py-2 rounded-lg transition-colors ${theme === 'day' ? 'bg-sky-500' : 'bg-gray-700 hover:bg-gray-600'} ${isSidebarFocused && focusableItems[focusedIndex].id === 'theme-day' ? 'ring-2 ring-yellow-400' : ''}`}>Day</button>
                     <button onClick={() => onSetTheme('afternoon')} className={`py-2 rounded-lg transition-colors ${theme === 'afternoon' ? 'bg-orange-500' : 'bg-gray-700 hover:bg-gray-600'} ${isSidebarFocused && focusableItems[focusedIndex].id === 'theme-afternoon' ? 'ring-2 ring-yellow-400' : ''}`}>Noon</button>
                     <button onClick={() => onSetTheme('night')} className={`py-2 rounded-lg transition-colors ${theme === 'night' ? 'bg-indigo-900' : 'bg-gray-700 hover:bg-gray-600'} ${isSidebarFocused && focusableItems[focusedIndex].id === 'theme-night' ? 'ring-2 ring-yellow-400' : ''}`}>Night</button>

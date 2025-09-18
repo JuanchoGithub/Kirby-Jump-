@@ -10,7 +10,7 @@ interface MainMenuProps {
 const MenuButton: React.FC<{onClick: () => void, isFocused: boolean, children: React.ReactNode}> = ({ onClick, isFocused, children }) => (
     <button
         onClick={onClick}
-        className={`w-64 px-6 py-4 bg-yellow-400 text-black font-bold text-xl rounded-lg shadow-lg hover:bg-yellow-500 transition-all transform hover:scale-105 ${isFocused ? 'ring-2 ring-yellow-300 ring-offset-4 ring-offset-gray-800' : ''}`}
+        className={`w-full max-w-xs sm:w-64 px-6 py-4 bg-yellow-400 text-black font-bold text-xl rounded-lg shadow-lg hover:bg-yellow-500 transition-all transform hover:scale-105 ${isFocused ? 'ring-2 ring-yellow-300 ring-offset-4 ring-offset-gray-800' : ''}`}
     >
         {children}
     </button>
@@ -54,12 +54,12 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onPlayOriginal, onGoToSelect
     }, [gamepadState, menuActions, focusedIndex]);
 
     return (
-        <div className="flex flex-col justify-center items-center bg-gray-800 bg-opacity-50 p-12 rounded-2xl shadow-2xl">
-            <h1 className="text-6xl font-bold text-white mb-4" style={{ textShadow: '3px 3px 6px rgba(0,0,0,0.7)' }}>
+        <div className="flex flex-col justify-center items-center bg-gray-800 bg-opacity-50 p-8 sm:p-12 rounded-2xl shadow-2xl">
+            <h1 className="text-4xl text-center sm:text-6xl font-bold text-white mb-4" style={{ textShadow: '3px 3px 6px rgba(0,0,0,0.7)' }}>
                 Kirby's Ascent
             </h1>
-            <p className="text-2xl text-white mb-12">Create and Play</p>
-            <div className="flex flex-col gap-6">
+            <p className="text-xl sm:text-2xl text-white mb-12">Create and Play</p>
+            <div className="flex flex-col gap-6 w-full items-center">
                 <MenuButton onClick={onPlayOriginal} isFocused={focusedIndex === 0}>Play Original Level</MenuButton>
                 <MenuButton onClick={onGoToSelect} isFocused={focusedIndex === 1}>My Levels</MenuButton>
                 <MenuButton onClick={onGoToEditor} isFocused={focusedIndex === 2}>Level Editor</MenuButton>
