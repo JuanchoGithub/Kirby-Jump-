@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { CheckpointData } from '../types';
 
@@ -45,6 +46,7 @@ export const Checkpoint: React.FC<CheckpointProps> = ({ position, width, height,
         width: width,
         height: height,
         transform: isBeingDragged ? 'scale(1.25)' : 'scale(1)',
+        willChange: 'left, top, transform',
       }}
       onMouseDown={isEditable ? onMouseDown : undefined}
       onTouchStart={isEditable ? onTouchStart : undefined}

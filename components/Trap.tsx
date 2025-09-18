@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { TrapData } from '../types';
 
@@ -62,6 +63,7 @@ export const Trap: React.FC<TrapProps> = ({ type, position, width, height, isSel
         width: width,
         height: height,
         transform: isBeingDragged ? 'scale(1.2)' : 'scale(1)',
+        willChange: 'left, top, width, transform',
         ...interactionStyle
       }}
       onMouseDown={isEditable ? onMouseDown : undefined}

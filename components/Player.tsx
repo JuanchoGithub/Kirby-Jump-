@@ -29,7 +29,8 @@ export const Player: React.FC<PlayerProps> = ({ playerState }) => {
         transform: `
           scaleY(${isJumping ? 1.1 : isFalling ? 0.9 : 1})
           scaleX(${isJumping || isFalling ? 0.95 : 1})
-        `
+        `,
+        willChange: 'left, top, transform'
       }}
     >
       <div 

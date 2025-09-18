@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { PlatformData } from '../types';
 
@@ -43,6 +44,7 @@ export const Platform: React.FC<PlatformProps> = ({ position, width, height, isS
         borderBottomWidth: '8px',
         filter: 'drop-shadow(5px 8px 4px rgba(0,0,0,0.3))',
         transform: `rotateX(5deg) ${isBeingDragged ? 'scale(1.1)' : 'scale(1)'}`,
+        willChange: 'left, top, width, transform',
         ...interactionStyle
       }}
       onMouseDown={isEditable ? onMouseDown : undefined}

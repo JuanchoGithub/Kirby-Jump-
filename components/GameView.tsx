@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useRef, useMemo, useEffect, useLayoutEffect } from 'react';
 import { Player } from './Player';
 import { Platform } from './Platform';
@@ -893,7 +894,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     return { backgroundImage: `linear-gradient(to right, ${gridColor} 1px, transparent 1px), linear-gradient(to bottom, ${gridColor} 1px, transparent 1px)`, backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px` };
   }, [mode, theme]);
   
-  const levelContainerStyle = { height: LEVEL_HEIGHT_MAX, transform: `translateY(${-cameraY}px)`, ...gridPattern };
+  const levelContainerStyle = { height: LEVEL_HEIGHT_MAX, transform: `translateY(${-cameraY}px)`, ...gridPattern, willChange: 'transform' as const };
   const gameViewportStyle: React.CSSProperties = {
     width: GAME_WIDTH, height: GAME_HEIGHT, perspective: '1000px', cursor: (mode === 'edit' && !isSidebarFocused && !isTouchDevice) ? 'none' : 'auto',
     ...(theme === 'twilight' && { backgroundImage: 'linear-gradient(to bottom, #0f172a, #1e3a8a, #3c5a99, #60a5fa, #a690c8, #fb923c, #fcd34d)', backgroundSize: `100% ${LEVEL_HEIGHT_MAX}px`, backgroundRepeat: 'no-repeat', backgroundPosition: `0px ${-cameraY}px`, }),
