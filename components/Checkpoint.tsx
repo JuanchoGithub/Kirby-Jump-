@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { CheckpointData } from '../types';
 
@@ -20,7 +19,7 @@ const StarIcon: React.FC<{className?: string; style?: React.CSSProperties}> = ({
 );
 
 
-export const Checkpoint: React.FC<CheckpointProps> = ({ position, width, height, isActive, isSelected, isEditable, onMouseDown, onTouchStart, isHovered, isBeingDragged }) => {
+export const Checkpoint: React.FC<CheckpointProps> = React.memo(({ position, width, height, isActive, isSelected, isEditable, onMouseDown, onTouchStart, isHovered, isBeingDragged }) => {
   const colorClass = isActive ? 'text-yellow-400' : 'text-gray-500';
   const animationClass = isActive ? 'animate-pulse' : 'opacity-60';
   
@@ -57,4 +56,4 @@ export const Checkpoint: React.FC<CheckpointProps> = ({ position, width, height,
       />
     </div>
   );
-};
+});

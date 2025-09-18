@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { PlatformData } from '../types';
 
@@ -15,7 +14,7 @@ interface PlatformProps extends PlatformData {
   activeHandle: 'left' | 'right' | null;
 }
 
-export const Platform: React.FC<PlatformProps> = ({ position, width, height, isSelected, isEditable, onMouseDown, onTouchStart, onResizeHandleMouseDown, onResizeHandleTouchStart, isHovered, isTouchDevice, isBeingDragged, activeHandle }) => {
+export const Platform: React.FC<PlatformProps> = React.memo(({ position, width, height, isSelected, isEditable, onMouseDown, onTouchStart, onResizeHandleMouseDown, onResizeHandleTouchStart, isHovered, isTouchDevice, isBeingDragged, activeHandle }) => {
   
   const getBoxShadow = () => {
     if (isSelected) return '0 0 15px 5px rgba(59, 130, 246, 0.7)';
@@ -67,4 +66,4 @@ export const Platform: React.FC<PlatformProps> = ({ position, width, height, isS
       )}
     </div>
   );
-};
+});

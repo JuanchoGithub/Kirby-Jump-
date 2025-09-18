@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { TrapData } from '../types';
 
@@ -36,7 +35,7 @@ const assetMap = {
     spikes: Spikes,
 };
 
-export const Trap: React.FC<TrapProps> = ({ type, position, width, height, isSelected, isEditable, onMouseDown, onTouchStart, onResizeHandleMouseDown, onResizeHandleTouchStart, isHovered, isTouchDevice, isBeingDragged, activeHandle }) => {
+export const Trap: React.FC<TrapProps> = React.memo(({ type, position, width, height, isSelected, isEditable, onMouseDown, onTouchStart, onResizeHandleMouseDown, onResizeHandleTouchStart, isHovered, isTouchDevice, isBeingDragged, activeHandle }) => {
   const getFilter = () => {
     if (isSelected) return 'drop-shadow(0px 0px 8px rgba(239, 68, 68, 0.9))';
     if (isHovered) return 'drop-shadow(0px 0px 8px rgba(255, 255, 255, 0.8))';
@@ -86,4 +85,4 @@ export const Trap: React.FC<TrapProps> = ({ type, position, width, height, isSel
       )}
     </div>
   );
-};
+});

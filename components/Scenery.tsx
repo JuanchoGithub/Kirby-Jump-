@@ -147,7 +147,7 @@ const assetMap: { [key in SceneryData['asset']]: React.ReactElement } = {
     shootingStar: <ShootingStar />,
 };
 
-export const Scenery: React.FC<SceneryProps> = ({ id, asset, position, width, height }) => {
+export const Scenery: React.FC<SceneryProps> = React.memo(({ id, asset, position, width, height }) => {
   const wrapperStyle: React.CSSProperties = {};
   let wrapperClassName = '';
 
@@ -185,4 +185,4 @@ export const Scenery: React.FC<SceneryProps> = ({ id, asset, position, width, he
         </div>
     </div>
   );
-};
+});
