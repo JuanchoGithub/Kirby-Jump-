@@ -101,7 +101,7 @@ export const Scenery: React.FC<SceneryProps> = ({ id, asset, position, width, he
         width: width,
         height: height,
         transform: `translateY(${parallaxY}px)`,
-        zIndex: -depth
+        zIndex: 0
       }}
     >
         <div className={wrapperClassName} style={wrapperStyle}>
