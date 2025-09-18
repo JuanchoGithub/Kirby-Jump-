@@ -6,10 +6,21 @@ interface PlatformProps extends PlatformData {
   isEditable: boolean;
   onMouseDown: (e: React.MouseEvent) => void;
   onResizeHandleMouseDown: (e: React.MouseEvent, direction: 'left' | 'right') => void;
+  isHovered: boolean;
 }
 
-export const Platform: React.FC<PlatformProps> = ({ position, width, height, isSelected, isEditable, onMouseDown, onResizeHandleMouseDown }) => {
-  const selectionStyle = isSelected ? { boxShadow: '0 0 15px 5px rgba(59, 130, 246, 0.7)' } : {};
+export const Platform: React.FC<PlatformProps> = ({ position, width, height, isSelected, isEditable, onMouseDown, onResizeHandleMouseDown, isHovered }) => {
+  
+  const getBoxShadow = () => {
+    if (isSelected) return '0 0 15px 5px rgba(59, 130, 246, 0.7)';
+    if (isHovered) return '0 0 15px 5px rgba(255, 255, 255, 0.5)';
+    return undefined;
+  };
+  
+  const interactionStyle = {
+    boxShadow: getBoxShadow(),
+  };
+
   const cursorStyle = isEditable ? 'cursor-move' : '';
 
   return (
@@ -23,7 +34,7 @@ export const Platform: React.FC<PlatformProps> = ({ position, width, height, isS
         borderBottomWidth: '8px',
         filter: 'drop-shadow(5px 8px 4px rgba(0,0,0,0.3))',
         transform: 'rotateX(5deg)',
-        ...selectionStyle
+        ...interactionStyle
       }}
       onMouseDown={isEditable ? onMouseDown : undefined}
     >

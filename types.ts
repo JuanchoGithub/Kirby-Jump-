@@ -9,6 +9,7 @@ export interface GameObject {
   position: Vector2D;
   width: number;
   height: number;
+  isHovered?: boolean;
 }
 
 export interface PlatformData extends GameObject {

@@ -6,6 +6,7 @@ interface TrapProps extends TrapData {
   isEditable: boolean;
   onMouseDown: (e: React.MouseEvent) => void;
   onResizeHandleMouseDown: (e: React.MouseEvent, direction: 'left' | 'right') => void;
+  isHovered: boolean;
 }
 
 const Spikes: React.FC<{width: number, height: number}> = ({ width, height }) => {
@@ -29,8 +30,17 @@ const assetMap = {
     spikes: Spikes,
 };
 
-export const Trap: React.FC<TrapProps> = ({ type, position, width, height, isSelected, isEditable, onMouseDown, onResizeHandleMouseDown }) => {
-  const selectionStyle = isSelected ? { filter: 'drop-shadow(0px 0px 8px rgba(239, 68, 68, 0.9))' } : {};
+export const Trap: React.FC<TrapProps> = ({ type, position, width, height, isSelected, isEditable, onMouseDown, onResizeHandleMouseDown, isHovered }) => {
+  const getFilter = () => {
+    if (isSelected) return 'drop-shadow(0px 0px 8px rgba(239, 68, 68, 0.9))';
+    if (isHovered) return 'drop-shadow(0px 0px 8px rgba(255, 255, 255, 0.8))';
+    return undefined;
+  }
+  
+  const interactionStyle = {
+    filter: getFilter(),
+  };
+
   const cursorStyle = isEditable ? 'cursor-move' : '';
   const TrapComponent = assetMap[type];
 
@@ -42,7 +52,7 @@ export const Trap: React.FC<TrapProps> = ({ type, position, width, height, isSel
         top: position.y,
         width: width,
         height: height,
-        ...selectionStyle
+        ...interactionStyle
       }}
       onMouseDown={isEditable ? onMouseDown : undefined}
     >

@@ -6,6 +6,7 @@ interface CheckpointProps extends CheckpointData {
   isSelected: boolean;
   isEditable: boolean;
   onMouseDown: (e: React.MouseEvent) => void;
+  isHovered: boolean;
 }
 
 // FIX: Added 'style' to the component's props to allow passing style attributes to the underlying SVG element.
@@ -16,10 +17,21 @@ const StarIcon: React.FC<{className?: string; style?: React.CSSProperties}> = ({
 );
 
 
-export const Checkpoint: React.FC<CheckpointProps> = ({ position, width, height, isActive, isSelected, isEditable, onMouseDown }) => {
+export const Checkpoint: React.FC<CheckpointProps> = ({ position, width, height, isActive, isSelected, isEditable, onMouseDown, isHovered }) => {
   const colorClass = isActive ? 'text-yellow-400' : 'text-gray-500';
   const animationClass = isActive ? 'animate-pulse' : 'opacity-60';
-  const selectionStyle = isSelected ? { filter: 'drop-shadow(0px 0px 10px rgba(59, 130, 246, 0.9))' } : {};
+  
+  const getFilter = () => {
+    const baseShadow = 'drop-shadow(0px 4px 6px rgba(0,0,0,0.4))';
+    if (isSelected) return 'drop-shadow(0px 0px 10px rgba(59, 130, 246, 0.9))';
+    if (isHovered) return 'drop-shadow(0px 0px 10px rgba(255, 255, 255, 0.8))';
+    return baseShadow;
+  };
+
+  const interactionStyle = {
+    filter: getFilter(),
+  };
+  
   const cursorStyle = isEditable ? 'cursor-move' : '';
 
   return (
@@ -30,11 +42,13 @@ export const Checkpoint: React.FC<CheckpointProps> = ({ position, width, height,
         top: position.y,
         width: width,
         height: height,
-        ...selectionStyle
       }}
       onMouseDown={isEditable ? onMouseDown : undefined}
     >
-      <StarIcon className={`w-full h-full ${colorClass} ${animationClass} transition-colors duration-500`} style={{filter: 'drop-shadow(0px 4px 6px rgba(0,0,0,0.4))'}} />
+      <StarIcon 
+        className={`w-full h-full ${colorClass} ${animationClass} transition-colors duration-500`} 
+        style={interactionStyle} 
+      />
     </div>
   );
 };

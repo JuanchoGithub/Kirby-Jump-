@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useGamepadInput } from '../hooks/useGamepadInput';
 
 interface MainMenuProps {
     onPlayOriginal: () => void;
@@ -6,16 +7,52 @@ interface MainMenuProps {
     onGoToEditor: () => void;
 }
 
-const MenuButton: React.FC<{onClick: () => void, children: React.ReactNode}> = ({ onClick, children }) => (
+const MenuButton: React.FC<{onClick: () => void, isFocused: boolean, children: React.ReactNode}> = ({ onClick, isFocused, children }) => (
     <button
         onClick={onClick}
-        className="w-64 px-6 py-4 bg-yellow-400 text-black font-bold text-xl rounded-lg shadow-lg hover:bg-yellow-500 transition-all transform hover:scale-105"
+        className={`w-64 px-6 py-4 bg-yellow-400 text-black font-bold text-xl rounded-lg shadow-lg hover:bg-yellow-500 transition-all transform hover:scale-105 ${isFocused ? 'ring-2 ring-yellow-300 ring-offset-4 ring-offset-gray-800' : ''}`}
     >
         {children}
     </button>
 );
 
 export const MainMenu: React.FC<MainMenuProps> = ({ onPlayOriginal, onGoToSelect, onGoToEditor }) => {
+    const [focusedIndex, setFocusedIndex] = useState(0);
+    const gamepadState = useGamepadInput();
+    const prevGamepadState = useRef(gamepadState);
+    const lastNavTime = useRef(0);
+    const mountTime = useRef(Date.now());
+
+    const menuActions = [onPlayOriginal, onGoToSelect, onGoToEditor];
+
+    useEffect(() => {
+        const now = Date.now();
+        const navCooldown = 150; // ms to prevent rapid scrolling
+        const inputGracePeriod = 200; // ms to ignore input after mount
+
+        const dpadUp = gamepadState.buttons[12]?.pressed && !prevGamepadState.current.buttons[12]?.pressed;
+        const dpadDown = gamepadState.buttons[13]?.pressed && !prevGamepadState.current.buttons[13]?.pressed;
+        const aButtonPressed = gamepadState.buttons[0]?.pressed && !prevGamepadState.current.buttons[0]?.pressed;
+
+        if (now - lastNavTime.current > navCooldown) {
+            if (dpadDown) {
+                setFocusedIndex(prev => (prev + 1) % menuActions.length);
+                lastNavTime.current = now;
+            } else if (dpadUp) {
+                setFocusedIndex(prev => (prev - 1 + menuActions.length) % menuActions.length);
+                lastNavTime.current = now;
+            }
+        }
+        
+        if (aButtonPressed) {
+            if (now - mountTime.current > inputGracePeriod) {
+                menuActions[focusedIndex]();
+            }
+        }
+
+        prevGamepadState.current = gamepadState;
+    }, [gamepadState, menuActions, focusedIndex]);
+
     return (
         <div className="flex flex-col justify-center items-center bg-gray-800 bg-opacity-50 p-12 rounded-2xl shadow-2xl">
             <h1 className="text-6xl font-bold text-white mb-4" style={{ textShadow: '3px 3px 6px rgba(0,0,0,0.7)' }}>
@@ -23,9 +60,9 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onPlayOriginal, onGoToSelect
             </h1>
             <p className="text-2xl text-white mb-12">Create and Play</p>
             <div className="flex flex-col gap-6">
-                <MenuButton onClick={onPlayOriginal}>Play Original Level</MenuButton>
-                <MenuButton onClick={onGoToSelect}>My Levels</MenuButton>
-                <MenuButton onClick={onGoToEditor}>Level Editor</MenuButton>
+                <MenuButton onClick={onPlayOriginal} isFocused={focusedIndex === 0}>Play Original Level</MenuButton>
+                <MenuButton onClick={onGoToSelect} isFocused={focusedIndex === 1}>My Levels</MenuButton>
+                <MenuButton onClick={onGoToEditor} isFocused={focusedIndex === 2}>Level Editor</MenuButton>
             </div>
         </div>
     );

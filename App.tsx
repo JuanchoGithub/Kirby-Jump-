@@ -25,8 +25,10 @@ const App: React.FC = () => {
   const [activeLevel, setActiveLevel] = useState<LevelData | null>(null);
   const [initialMode, setInitialMode] = useState<'play' | 'edit'>('play');
   const [theme, setTheme] = useState<Theme>('day');
+  const [sourceScreen, setSourceScreen] = useState<'menu' | 'select'>('menu');
 
   const handlePlayOriginal = () => {
+    setSourceScreen('menu');
     setActiveLevel(ORIGINAL_LEVEL);
     setInitialMode('play');
     setAppState('game');
@@ -38,13 +40,15 @@ const App: React.FC = () => {
 
   const handleGoToEditor = (level: LevelData | null) => {
     if (level) {
+      setSourceScreen('select'); // Came from level select
       setActiveLevel(level);
     } else {
+      setSourceScreen('menu'); // Came from main menu (new level)
       // Create a new blank level with just the floor
       const newId = Date.now();
       setActiveLevel({
         name: `New Level ${newId}`,
-        platforms: [{ id: 0, position: { x: 0, y: 3980 }, width: GAME_WIDTH, height: 20 }],
+        platforms: [{ id: 0, position: { x: 300 - GAME_WIDTH / 2, y: 3980 }, width: GAME_WIDTH, height: 20 }],
         checkpoints: [],
         traps: [],
       });
@@ -54,6 +58,7 @@ const App: React.FC = () => {
   };
   
   const handlePlayLevel = (level: LevelData) => {
+    setSourceScreen('select');
     setActiveLevel(level);
     setInitialMode('play');
     setAppState('game');
@@ -61,12 +66,7 @@ const App: React.FC = () => {
 
   const handleExitGame = () => {
     setActiveLevel(null);
-    // Go back to the level select screen if we came from there, otherwise menu
-    if (activeLevel?.name !== ORIGINAL_LEVEL.name && appState !== 'menu') {
-       setAppState('select');
-    } else {
-       setAppState('menu');
-    }
+    setAppState(sourceScreen);
   };
 
   const renderContent = () => {
