@@ -5,22 +5,37 @@ import { GAME_WIDTH } from '../constants';
 interface SceneryProps extends SceneryData {}
 
 const Cloud1: React.FC = () => (
-    <div className="w-full h-full">
-        <div className="relative w-full h-full opacity-80">
-            <div className="absolute w-full h-full" style={{ background: 'radial-gradient(circle, white 50%, transparent 80%)' }} />
-            <div className="absolute w-1/2 h-1/2 -top-1/4 left-1/4" style={{ background: 'radial-gradient(circle, white 50%, transparent 80%)' }} />
-            <div className="absolute w-3/5 h-3/5 -bottom-1/4 left-1/8" style={{ background: 'radial-gradient(circle, white 50%, transparent 80%)' }} />
-            <div className="absolute w-2/5 h-2/5 -bottom-1/4 right-1/4" style={{ background: 'radial-gradient(circle, white 50%, transparent 80%)' }} />
-        </div>
+    <div className="w-full h-full opacity-80">
+        <svg viewBox="0 0 150 100" className="w-full h-full" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+                <filter id="cloudBlurFilter1" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur in="SourceGraphic" stdDeviation="10" />
+                </filter>
+            </defs>
+            <g filter="url(#cloudBlurFilter1)">
+                <circle cx="75" cy="50" r="30" fill="white" />
+                <circle cx="45" cy="55" r="25" fill="white" />
+                <circle cx="105" cy="55" r="25" fill="white" />
+                <circle cx="75" cy="35" r="20" fill="white" />
+            </g>
+        </svg>
     </div>
 );
 
 const Cloud2: React.FC = () => (
-    <div className="w-full h-full">
-        <div className="relative w-full h-full opacity-70">
-            <div className="absolute w-full h-full" style={{ background: 'radial-gradient(circle, white 50%, transparent 80%)' }} />
-            <div className="absolute w-3/4 h-3/4 top-0 right-0" style={{ background: 'radial-gradient(circle, white 50%, transparent 80%)' }} />
-        </div>
+    <div className="w-full h-full opacity-70">
+        <svg viewBox="0 0 120 80" className="w-full h-full" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+                <filter id="cloudBlurFilter2" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur in="SourceGraphic" stdDeviation="8" />
+                </filter>
+            </defs>
+            <g filter="url(#cloudBlurFilter2)">
+                <circle cx="60" cy="40" r="25" fill="white" />
+                <circle cx="85" cy="45" r="20" fill="white" />
+                <circle cx="35" cy="45" r="18" fill="white" />
+            </g>
+        </svg>
     </div>
 );
 
@@ -47,16 +62,22 @@ const Hill1: React.FC = () => (
 );
 
 const Sun: React.FC = () => (
-    <div className="relative w-full h-full flex items-center justify-center">
-        <div 
-            className="absolute w-[200%] h-[200%] rounded-full animate-glow"
-            style={{
-                background: 'radial-gradient(circle, rgba(253, 224, 71, 0.4) 20%, transparent 60%)',
-            }}
-        />
-        <div className="absolute w-full h-full bg-yellow-300 rounded-full" />
-    </div>
+    <svg viewBox="0 0 100 100" className="w-full h-full" style={{ overflow: 'visible' }} aria-hidden="true">
+        <defs>
+            <radialGradient id="sunGlowGradient">
+                <stop offset="20%" stopColor="rgba(253, 224, 71, 0.4)" />
+                <stop offset="60%" stopColor="rgba(253, 224, 71, 0)" />
+            </radialGradient>
+        </defs>
+        <g className="animate-glow" style={{ transformOrigin: '50% 50%' }}>
+            {/* Glow layer */}
+            <circle cx="50" cy="50" r="100" fill="url(#sunGlowGradient)" />
+        </g>
+        {/* Solid sun layer */}
+        <circle cx="50" cy="50" r="50" fill="#fde047" /> {/* Tailwind yellow-300 */}
+    </svg>
 );
+
 
 const Bird: React.FC = () => (
     <div className="w-full h-full animate-fly">
