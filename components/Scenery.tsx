@@ -7,16 +7,20 @@ interface SceneryProps extends SceneryData {
 }
 
 const Cloud1: React.FC = () => (
-    <div className="w-full h-full bg-white rounded-full opacity-80 filter blur-sm">
-        <div className="absolute w-1/2 h-1/2 bg-white rounded-full -top-1/4 left-1/4" />
-        <div className="absolute w-3/5 h-3/5 bg-white rounded-full -bottom-1/4 left-1/8" />
-        <div className="absolute w-2/5 h-2/5 bg-white rounded-full -bottom-1/4 right-1/4" />
+    <div className="w-full h-full filter blur-sm">
+        <div className="relative w-full h-full bg-white rounded-full opacity-80">
+            <div className="absolute w-1/2 h-1/2 bg-white rounded-full -top-1/4 left-1/4" />
+            <div className="absolute w-3/5 h-3/5 bg-white rounded-full -bottom-1/4 left-1/8" />
+            <div className="absolute w-2/5 h-2/5 bg-white rounded-full -bottom-1/4 right-1/4" />
+        </div>
     </div>
 );
 
 const Cloud2: React.FC = () => (
-    <div className="w-full h-full bg-white rounded-full opacity-70 filter blur-sm">
-        <div className="absolute w-3/4 h-3/4 bg-white rounded-full top-0 right-0" />
+    <div className="w-full h-full filter blur-sm">
+        <div className="relative w-full h-full bg-white rounded-full opacity-70">
+            <div className="absolute w-3/4 h-3/4 bg-white rounded-full top-0 right-0" />
+        </div>
     </div>
 );
 
