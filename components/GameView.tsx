@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useRef, useMemo, useEffect, useLayoutEffect } from 'react';
 import { Player } from './Player';
 import { Platform } from './Platform';
@@ -429,6 +428,16 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     });
     setPlatforms(updatedPlatforms);
     setTraps(updatedTraps);
+    
+    // --- OPTIMIZATION: Cull objects outside the player's vicinity ---
+    const checkBuffer = GAME_HEIGHT / 2;
+    const checkAreaYTop = cameraY - checkBuffer;
+    const checkAreaYBottom = cameraY + GAME_HEIGHT + checkBuffer;
+
+    const activePlatforms = updatedPlatforms.filter(p => p.position.y + p.height >= checkAreaYTop && p.position.y <= checkAreaYBottom);
+    const activeTraps = updatedTraps.filter(t => t.position.y + t.height >= checkAreaYTop && t.position.y <= checkAreaYBottom);
+    const activeCheckpointsForCollision = checkpoints.filter(c => c.position.y + c.height >= checkAreaYTop && c.position.y <= checkAreaYBottom);
+
     setPlayerState(prev => {
       let { position, velocity, isGrounded, lastCheckpoint } = { ...prev };
       if (prev.isGrounded && prev.groundedOnPlatformId) {
@@ -468,7 +477,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
       velocity.y += GRAVITY;
       const nextPosition = { x: position.x + velocity.x, y: position.y + velocity.y };
       let finalGroundedPlatform: PlatformData | null = null;
-      for (const platform of updatedPlatforms) {
+      for (const platform of activePlatforms) {
         if (position.y + PLAYER_HEIGHT <= platform.position.y + 1 && nextPosition.y + PLAYER_HEIGHT >= platform.position.y && velocity.y >= 0 && nextPosition.x + PLAYER_WIDTH > platform.position.x && nextPosition.x < platform.position.x + platform.width) {
           if (finalGroundedPlatform === null || platform.position.y < finalGroundedPlatform.position.y) finalGroundedPlatform = platform;
         }
@@ -483,14 +492,14 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
       position = { ...nextPosition };
       if (position.x < 0) position.x = 0;
       if (position.x > GAME_WIDTH - PLAYER_WIDTH) position.x = GAME_WIDTH - PLAYER_WIDTH;
-      for (const trap of updatedTraps) {
+      for (const trap of activeTraps) {
           if (position.x < trap.position.x + trap.width && position.x + PLAYER_WIDTH > trap.position.x && position.y < trap.position.y + trap.height && position.y + PLAYER_HEIGHT > trap.position.y) {
               position = { ...lastCheckpoint }; velocity = { x: 0, y: 0 }; isGrounded = false; groundedOnPlatformId = null; break;
           }
       }
       if (position.y > LEVEL_HEIGHT_MAX) { position = { ...lastCheckpoint }; velocity = { x: 0, y: 0 }; isGrounded = false; groundedOnPlatformId = null; }
       const victoryCheckpoint = checkpoints.length > 0 ? checkpoints.sort((a, b) => a.position.y - b.position.y)[0] : null;
-      for (const checkpoint of checkpoints) {
+      for (const checkpoint of activeCheckpointsForCollision) {
         if (position.x < checkpoint.position.x + checkpoint.width && position.x + PLAYER_WIDTH > checkpoint.position.x && position.y < checkpoint.position.y + checkpoint.height && position.y + PLAYER_HEIGHT > checkpoint.position.y) {
           if (!activeCheckpoints.has(checkpoint.id)) {
             setActiveCheckpoints(prev => new Set(prev).add(checkpoint.id));
