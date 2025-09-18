@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useGamepadInput } from '../hooks/useGamepadInput';
+import { useIsTouchDevice } from '../hooks/useIsTouchDevice';
 
 interface MainMenuProps {
     onPlayOriginal: () => void;
@@ -22,8 +23,29 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onPlayOriginal, onGoToSelect
     const prevGamepadState = useRef(gamepadState);
     const lastNavTime = useRef(0);
     const mountTime = useRef(Date.now());
+    const isTouchDevice = useIsTouchDevice();
 
-    const menuActions = [onPlayOriginal, onGoToSelect, onGoToEditor];
+    const handleFullScreen = () => {
+        if (document.fullscreenEnabled) {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+                });
+            }
+        } else {
+            alert('Fullscreen is not supported on this device/browser.');
+        }
+    };
+
+    const menuItems = [
+        { label: 'Play Original Level', action: onPlayOriginal },
+        { label: 'My Levels', action: onGoToSelect },
+        { label: 'Level Editor', action: onGoToEditor },
+    ];
+
+    if (isTouchDevice) {
+        menuItems.push({ label: 'Go Fullscreen', action: handleFullScreen });
+    }
 
     useEffect(() => {
         const now = Date.now();
@@ -36,22 +58,22 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onPlayOriginal, onGoToSelect
 
         if (now - lastNavTime.current > navCooldown) {
             if (dpadDown) {
-                setFocusedIndex(prev => (prev + 1) % menuActions.length);
+                setFocusedIndex(prev => (prev + 1) % menuItems.length);
                 lastNavTime.current = now;
             } else if (dpadUp) {
-                setFocusedIndex(prev => (prev - 1 + menuActions.length) % menuActions.length);
+                setFocusedIndex(prev => (prev - 1 + menuItems.length) % menuItems.length);
                 lastNavTime.current = now;
             }
         }
         
         if (aButtonPressed) {
             if (now - mountTime.current > inputGracePeriod) {
-                menuActions[focusedIndex]();
+                menuItems[focusedIndex].action();
             }
         }
 
         prevGamepadState.current = gamepadState;
-    }, [gamepadState, menuActions, focusedIndex]);
+    }, [gamepadState, menuItems, focusedIndex]);
 
     return (
         <div className="flex flex-col justify-center items-center bg-gray-800 bg-opacity-50 p-8 sm:p-12 rounded-2xl shadow-2xl">
@@ -60,9 +82,11 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onPlayOriginal, onGoToSelect
             </h1>
             <p className="text-xl sm:text-2xl text-white mb-12">Create and Play</p>
             <div className="flex flex-col gap-6 w-full items-center">
-                <MenuButton onClick={onPlayOriginal} isFocused={focusedIndex === 0}>Play Original Level</MenuButton>
-                <MenuButton onClick={onGoToSelect} isFocused={focusedIndex === 1}>My Levels</MenuButton>
-                <MenuButton onClick={onGoToEditor} isFocused={focusedIndex === 2}>Level Editor</MenuButton>
+                {menuItems.map((item, index) => (
+                    <MenuButton key={item.label} onClick={item.action} isFocused={focusedIndex === index}>
+                        {item.label}
+                    </MenuButton>
+                ))}
             </div>
         </div>
     );

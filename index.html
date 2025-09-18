@@ -55,6 +55,14 @@
 .animate-ring-rotate { animation: ring-rotate 4s ease-in-out infinite alternate; }
 .animate-twinkle { animation: twinkle ease-in-out infinite alternate; }
 .animate-shoot { animation: shoot linear infinite; }
+
+/* Prevent mobile browser gestures like pull-to-refresh */
+html, body {
+  overscroll-behavior-y: contain;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
 </style>
 </head>
   <body>

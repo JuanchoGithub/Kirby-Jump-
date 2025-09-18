@@ -102,7 +102,6 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
   const [onScreenControls, setOnScreenControls] = useState<OnScreenControlsState>({ move: 0, jump: false });
 
   const dpadSpeedChangeState = useRef({ startTime: 0, direction: 0, lastTick: 0 });
-  const prevOnScreenControls = useRef(onScreenControls);
   
   const editorAction = useRef<{
     type: 'move' | 'resize-left' | 'resize-right' | 'move-path-end',
@@ -462,9 +461,11 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
       velocity.x = horizontalInput * PLAYER_SPEED;
       
       const jumpPressed = activeKeys.has('ArrowUp') || (gamepadState.buttons[0]?.pressed);
-      const onScreenJumpPressed = !prevOnScreenControls.current.jump && onScreenControls.jump;
 
-      if ((jumpPressed || onScreenJumpPressed) && isGrounded) velocity.y = JUMP_STRENGTH;
+      if ((jumpPressed || onScreenControls.jump) && isGrounded) {
+          velocity.y = JUMP_STRENGTH;
+      }
+
       velocity.y += GRAVITY;
       const nextPosition = { x: position.x + velocity.x, y: position.y + velocity.y };
       let finalGroundedPlatform: PlatformData | null = null;
@@ -508,8 +509,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
       return { position, velocity, isGrounded, lastCheckpoint, isJumping: !isGrounded && velocity.y < 0, isFalling: !isGrounded && velocity.y > 0, groundedOnPlatformId };
     });
     prevGamepadState.current = gamepadState;
-    prevOnScreenControls.current = onScreenControls;
-  }, [cameraY, activeCheckpoints, isFinished, platforms, checkpoints, traps, mode, movingPlatformState, gamepadState, handleEditorGamepadInput, editorCursor.pos, selectedObjectId, activeTool, hoveredObjectId, onScreenControls]);
+  }, [cameraY, activeCheckpoints, isFinished, platforms, checkpoints, traps, mode, movingPlatformState, gamepadState, handleEditorGamepadInput, editorCursor.pos, selectedObjectId, activeTool, hoveredObjectId, onScreenControls, activeKeys]);
 
   useGameLoop(gameTick, isFinished || showTestConfirm || showExitConfirm || (mode === 'edit' && isSidebarFocused));
   
@@ -815,7 +815,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
   }
 
   return (
-    <div className="w-full h-full flex flex-col lg:flex-row items-center justify-center relative">
+    <div className={`w-full h-full flex items-center justify-center relative ${mode === 'edit' && !isTouchDevice ? 'flex-row' : 'flex-col lg:flex-row'}`}>
       <div ref={gameContainerRef} className="flex-grow w-full h-full flex justify-center items-center p-2 lg:p-4">
         <div style={{ transform: `scale(${scale})` }}>
             <div
@@ -883,21 +883,23 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
 
       {mode === 'edit' && (
         <>
-            <button 
-                onClick={() => setIsSidebarOpen(true)}
-                className={`lg:hidden fixed bottom-4 right-4 z-40 bg-blue-600 hover:bg-blue-500 text-white p-3 rounded-full shadow-lg transition-opacity ${isSidebarOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
-                aria-label="Open Editor Sidebar"
-            >
-                <div className="w-6 h-6"><EditIcon/></div>
-            </button>
+            {isTouchDevice && (
+              <button 
+                  onClick={() => setIsSidebarOpen(true)}
+                  className={`lg:hidden fixed bottom-4 right-4 z-40 bg-blue-600 hover:bg-blue-500 text-white p-3 rounded-full shadow-lg transition-opacity ${isSidebarOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+                  aria-label="Open Editor Sidebar"
+              >
+                  <div className="w-6 h-6"><EditIcon/></div>
+              </button>
+            )}
 
-            {isSidebarOpen && <div onClick={() => setIsSidebarOpen(false)} className="lg:hidden fixed inset-0 bg-black/50 z-20" />}
+            {isTouchDevice && isSidebarOpen && <div onClick={() => setIsSidebarOpen(false)} className="lg:hidden fixed inset-0 bg-black/50 z-20" />}
             
             <div className={`
-                h-full transition-transform duration-300 ease-in-out bg-gray-800
-                fixed top-0 right-0 w-full max-w-xs sm:w-72 z-30
-                ${isSidebarOpen ? 'translate-x-0 shadow-2xl' : 'translate-x-full'}
-                lg:relative lg:translate-x-0 lg:shadow-none lg:w-72 lg:h-auto lg:flex-shrink-0
+                ${isTouchDevice 
+                    ? `h-full transition-transform duration-300 ease-in-out bg-gray-800 fixed top-0 right-0 w-full max-w-xs sm:w-72 z-30 ${isSidebarOpen ? 'translate-x-0 shadow-2xl' : 'translate-x-full'} lg:relative lg:translate-x-0 lg:shadow-none lg:w-72 lg:h-auto lg:flex-shrink-0`
+                    : 'h-full bg-gray-800 relative w-72 flex-shrink-0'
+                }
             `}>
                 <EditorSidebar
                     theme={theme}
