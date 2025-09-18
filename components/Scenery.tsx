@@ -7,19 +7,21 @@ interface SceneryProps extends SceneryData {
 }
 
 const Cloud1: React.FC = () => (
-    <div className="w-full h-full filter blur-sm">
-        <div className="relative w-full h-full bg-white rounded-full opacity-80">
-            <div className="absolute w-1/2 h-1/2 bg-white rounded-full -top-1/4 left-1/4" />
-            <div className="absolute w-3/5 h-3/5 bg-white rounded-full -bottom-1/4 left-1/8" />
-            <div className="absolute w-2/5 h-2/5 bg-white rounded-full -bottom-1/4 right-1/4" />
+    <div className="w-full h-full">
+        <div className="relative w-full h-full opacity-80">
+            <div className="absolute w-full h-full" style={{ background: 'radial-gradient(circle, white 50%, transparent 80%)' }} />
+            <div className="absolute w-1/2 h-1/2 -top-1/4 left-1/4" style={{ background: 'radial-gradient(circle, white 50%, transparent 80%)' }} />
+            <div className="absolute w-3/5 h-3/5 -bottom-1/4 left-1/8" style={{ background: 'radial-gradient(circle, white 50%, transparent 80%)' }} />
+            <div className="absolute w-2/5 h-2/5 -bottom-1/4 right-1/4" style={{ background: 'radial-gradient(circle, white 50%, transparent 80%)' }} />
         </div>
     </div>
 );
 
 const Cloud2: React.FC = () => (
-    <div className="w-full h-full filter blur-sm">
-        <div className="relative w-full h-full bg-white rounded-full opacity-70">
-            <div className="absolute w-3/4 h-3/4 bg-white rounded-full top-0 right-0" />
+    <div className="w-full h-full">
+        <div className="relative w-full h-full opacity-70">
+            <div className="absolute w-full h-full" style={{ background: 'radial-gradient(circle, white 50%, transparent 80%)' }} />
+            <div className="absolute w-3/4 h-3/4 top-0 right-0" style={{ background: 'radial-gradient(circle, white 50%, transparent 80%)' }} />
         </div>
     </div>
 );
@@ -32,7 +34,15 @@ const Hill1: React.FC = () => (
 );
 
 const Sun: React.FC = () => (
-    <div className="w-full h-full bg-yellow-300 rounded-full animate-glow"/>
+    <div className="relative w-full h-full flex items-center justify-center">
+        <div 
+            className="absolute w-[200%] h-[200%] rounded-full animate-glow"
+            style={{
+                background: 'radial-gradient(circle, rgba(253, 224, 71, 0.4) 20%, transparent 60%)',
+            }}
+        />
+        <div className="absolute w-full h-full bg-yellow-300 rounded-full" />
+    </div>
 );
 
 const Bird: React.FC = () => (
