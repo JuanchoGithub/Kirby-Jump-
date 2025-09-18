@@ -99,7 +99,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
   const [isEditingPath, setIsEditingPath] = useState(false);
   const [scale, setScale] = useState(1);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
-  const [onScreenControls, setOnScreenControls] = useState<OnScreenControlsState>({ left: false, right: false, jump: false });
+  const [onScreenControls, setOnScreenControls] = useState<OnScreenControlsState>({ move: 0, jump: false });
 
   const dpadSpeedChangeState = useRef({ startTime: 0, direction: 0, lastTick: 0 });
   const prevOnScreenControls = useRef(onScreenControls);
@@ -437,14 +437,29 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
         const delta = platformDeltas.get(prev.groundedOnPlatformId);
         if (delta) { position.x += delta.x; position.y += delta.y; }
       }
-      const playerMovementDeadzone = 0.75;
+      
+      const deadzone = 0.2;
       const leftStickX = gamepadState.axes[0] || 0;
-      const isLeft = activeKeys.has('ArrowLeft') || leftStickX < -playerMovementDeadzone || onScreenControls.left;
-      const isRight = activeKeys.has('ArrowRight') || leftStickX > playerMovementDeadzone || onScreenControls.right;
+      
+      let horizontalInput = 0;
 
-      if (isLeft && !isRight) velocity.x = -PLAYER_SPEED;
-      else if (isRight && !isLeft) velocity.x = PLAYER_SPEED;
-      else velocity.x = 0;
+      // Gamepad has priority
+      if (Math.abs(leftStickX) > deadzone) {
+          horizontalInput = leftStickX;
+      } 
+      // Then on-screen stick
+      else if (Math.abs(onScreenControls.move) > deadzone) {
+          horizontalInput = onScreenControls.move;
+      }
+      // Fallback to keyboard
+      else {
+          const isLeft = activeKeys.has('ArrowLeft');
+          const isRight = activeKeys.has('ArrowRight');
+          if (isLeft && !isRight) horizontalInput = -1;
+          else if (isRight && !isLeft) horizontalInput = 1;
+      }
+      
+      velocity.x = horizontalInput * PLAYER_SPEED;
       
       const jumpPressed = activeKeys.has('ArrowUp') || (gamepadState.buttons[0]?.pressed);
       const onScreenJumpPressed = !prevOnScreenControls.current.jump && onScreenControls.jump;
