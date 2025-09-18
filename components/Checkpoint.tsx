@@ -8,6 +8,7 @@ interface CheckpointProps extends CheckpointData {
   onMouseDown: (e: React.MouseEvent) => void;
   onTouchStart: (e: React.TouchEvent) => void;
   isHovered: boolean;
+  isBeingDragged: boolean;
 }
 
 // FIX: Added 'style' to the component's props to allow passing style attributes to the underlying SVG element.
@@ -18,7 +19,7 @@ const StarIcon: React.FC<{className?: string; style?: React.CSSProperties}> = ({
 );
 
 
-export const Checkpoint: React.FC<CheckpointProps> = ({ position, width, height, isActive, isSelected, isEditable, onMouseDown, onTouchStart, isHovered }) => {
+export const Checkpoint: React.FC<CheckpointProps> = ({ position, width, height, isActive, isSelected, isEditable, onMouseDown, onTouchStart, isHovered, isBeingDragged }) => {
   const colorClass = isActive ? 'text-yellow-400' : 'text-gray-500';
   const animationClass = isActive ? 'animate-pulse' : 'opacity-60';
   
@@ -37,12 +38,13 @@ export const Checkpoint: React.FC<CheckpointProps> = ({ position, width, height,
 
   return (
     <div
-      className={`absolute flex items-center justify-center ${cursorStyle}`}
+      className={`absolute flex items-center justify-center ${cursorStyle} transition-transform duration-100 ${isBeingDragged ? 'z-50' : ''}`}
       style={{
         left: position.x,
         top: position.y,
         width: width,
         height: height,
+        transform: isBeingDragged ? 'scale(1.25)' : 'scale(1)',
       }}
       onMouseDown={isEditable ? onMouseDown : undefined}
       onTouchStart={isEditable ? onTouchStart : undefined}

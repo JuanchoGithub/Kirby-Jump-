@@ -9,6 +9,7 @@ import { OnScreenControls, OnScreenControlsState } from './OnScreenControls';
 import { useGameLoop } from '../hooks/useGameLoop';
 import { useKeyboardInput } from '../hooks/useKeyboardInput';
 import { useGamepadInput } from '../hooks/useGamepadInput';
+import { useMobileDetection } from '../hooks/useIsTouchDevice';
 import { PlayerState, Vector2D, PlatformData, CheckpointData, LevelData, Theme, TrapData, GameObject } from '../types';
 import {
   GRAVITY, JUMP_STRENGTH, PLAYER_SPEED, PLAYER_WIDTH, PLAYER_HEIGHT,
@@ -98,7 +99,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
   const [exitConfirmFocusIndex, setExitConfirmFocusIndex] = useState(0);
   const [isEditingPath, setIsEditingPath] = useState(false);
   const [scale, setScale] = useState(1);
-  const [isTouchDevice, setIsTouchDevice] = useState(false);
+  const { isTouch: isTouchDevice } = useMobileDetection();
   const [onScreenControls, setOnScreenControls] = useState<OnScreenControlsState>({ move: 0, jump: false });
 
   const dpadSpeedChangeState = useRef({ startTime: 0, direction: 0, lastTick: 0 });
@@ -124,10 +125,6 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
   const prevGamepadState = useRef(gamepadState);
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const gameContainerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-      setIsTouchDevice('ontouchstart' in window || navigator.maxTouchPoints > 0);
-  }, []);
 
   useLayoutEffect(() => {
     const calculateScale = () => {
@@ -578,14 +575,11 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     setConfirmFocusIndex(0);
   };
 
-  // FIX: Correctly handle React's synthetic event types to avoid conflicts with native DOM types.
-  // Replaced native Touch/MouseEvent types with React's, and fixed iteration over non-iterable TouchList.
   const getEventPosition = useCallback((e: React.MouseEvent | React.TouchEvent): Vector2D | null => {
     let touchToUse: React.Touch | React.MouseEvent | undefined;
   
     if ('touches' in e) {
       let relevantTouches: React.TouchList;
-      // touchend events don't have the touch in `touches`, only `changedTouches`
       if (e.type === 'touchend' || e.type === 'touchcancel') {
         relevantTouches = e.changedTouches;
       } else {
@@ -593,7 +587,6 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
       }
   
       if (editorTouchId.current !== null) {
-        // Find the touch we are tracking
         for (let i = 0; i < relevantTouches.length; i++) {
           const touch = relevantTouches.item(i);
           if (touch.identifier === editorTouchId.current) {
@@ -603,7 +596,6 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
         }
       }
       
-      // Fallback for start events or if the tracked touch wasn't found
       if (!touchToUse && e.changedTouches.length > 0) {
         touchToUse = e.changedTouches[0];
       }
@@ -652,7 +644,6 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
   const handleEditorInteractionMove = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     if ('touches' in e) { 
         e.preventDefault(); 
-        // If not tracking a touch, don't do anything for move events
         if (editorTouchId.current === null && editorAction.current) return;
     }
 
@@ -684,9 +675,32 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
         const newPos = { x: originalObject.position.x + delta.x, y: originalObject.position.y + delta.y };
         setCheckpoints(prev => prev.map(c => c.id === objectId ? { ...c, position: newPos } : c));
       } else if (traps.some(t => t.id === objectId)) {
-        const trap = originalObject as TrapData;
-        const targetPlatform = platforms.filter(p => currentPos.x >= p.position.x && currentPos.x < p.position.x + p.width && currentPos.y > p.position.y).sort((a,b) => a.position.y - b.position.y)[0] || null;
-        if (targetPlatform) setTraps(prev => prev.map(t => t.id === objectId ? { ...t, position: { x: currentPos.x - trap.width / 2, y: targetPlatform.position.y - trap.height }, platformId: targetPlatform.id } : t));
+        const newPos = { x: originalObject.position.x + delta.x, y: originalObject.position.y + delta.y };
+
+        const trapCenterX = newPos.x + originalObject.width / 2;
+        
+        const potentialPlatforms = platforms.filter(p => 
+            trapCenterX >= p.position.x && 
+            trapCenterX < p.position.x + p.width
+        );
+
+        let targetPlatform: PlatformData | null = null;
+        let minDistance = Infinity;
+
+        for (const p of potentialPlatforms) {
+            const distance = Math.abs((newPos.y + originalObject.height) - p.position.y);
+            if (distance < minDistance) {
+                minDistance = distance;
+                targetPlatform = p;
+            }
+        }
+        
+        if (targetPlatform && minDistance < GRID_SIZE * 3) {
+            newPos.y = targetPlatform.position.y - originalObject.height;
+            setTraps(prev => prev.map(t => t.id === objectId ? { ...t, position: newPos, platformId: targetPlatform!.id } : t));
+        } else {
+            setTraps(prev => prev.map(t => t.id === objectId ? { ...t, position: newPos, platformId: null } : t));
+        }
       }
     } else if (type === 'move-path-end') {
         const platform = originalObject as PlatformData;
@@ -724,9 +738,47 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     const { type, objectId } = editorAction.current;
     
     if (type === 'move') {
-        if (platforms.some(p => p.id === objectId)) { setPlatforms(prev => prev.map(p => p.id === objectId ? { ...p, position: { x: snapToGrid(p.position.x), y: snapToGrid(p.position.y) } } : p)); }
-        else if (checkpoints.some(c => c.id === objectId)) { setCheckpoints(prev => prev.map(c => c.id === objectId ? { ...c, position: { x: snapToGrid(c.position.x), y: snapToGrid(c.position.y) } } : c)); }
-        else if (traps.some(t => t.id === objectId)) { setTraps(prev => prev.map(t => t.id === objectId ? { ...t, position: { x: snapToGrid(t.position.x), y: snapToGrid(t.position.y) } } : t)); }
+        const platformToMove = platforms.find(p => p.id === objectId);
+        const checkpointToMove = checkpoints.find(c => c.id === objectId);
+        const trapToMove = traps.find(t => t.id === objectId);
+
+        if (platformToMove) {
+            const newPos = { x: snapToGrid(platformToMove.position.x), y: snapToGrid(platformToMove.position.y) };
+            const platformDelta = { x: newPos.x - platformToMove.position.x, y: newPos.y - platformToMove.position.y };
+
+            if (platformDelta.x !== 0 || platformDelta.y !== 0) {
+                setPlatforms(prev => prev.map(p => {
+                    if (p.id !== objectId) return p;
+                    const newMovement = p.movement ? { ...p.movement, path: [newPos, { x: p.movement.path[1].x + platformDelta.x, y: p.movement.path[1].y + platformDelta.y }] as [Vector2D, Vector2D] } : undefined;
+                    return { ...p, position: newPos, movement: newMovement };
+                }));
+                setTraps(prevTraps => prevTraps.map(t => {
+                    if (t.platformId === objectId) {
+                        return { ...t, position: { x: t.position.x + platformDelta.x, y: t.position.y + platformDelta.y } };
+                    }
+                    return t;
+                }));
+            }
+        } else if (checkpointToMove) {
+            setCheckpoints(prev => prev.map(c => c.id === objectId ? { ...c, position: { x: snapToGrid(c.position.x), y: snapToGrid(c.position.y) } } : c));
+        } else if (trapToMove) {
+            const finalX = snapToGrid(trapToMove.position.x);
+            const finalCenterX = finalX + trapToMove.width / 2;
+            const finalY = trapToMove.position.y;
+
+            const targetPlatform = platforms
+                .filter(p => finalCenterX >= p.position.x && finalCenterX < p.position.x + p.width && Math.abs((finalY + trapToMove.height) - p.position.y) < GRID_SIZE * 2)
+                .sort((a, b) => a.position.y - b.position.y)[0] || null;
+            
+            setTraps(prev => prev.map(t => {
+                if (t.id !== objectId) return t;
+                if (targetPlatform) {
+                    return { ...t, position: { x: finalX, y: targetPlatform.position.y - t.height }, platformId: targetPlatform.id };
+                } else {
+                    return { ...t, position: { x: finalX, y: snapToGrid(finalY) }, platformId: null };
+                }
+            }));
+        }
     } else if (type === 'move-path-end') {
         setPlatforms(prev => prev.map(p => { if (p.id !== objectId || !p.movement) return p; return { ...p, movement: { ...p.movement, path: [p.movement.path[0], { x: snapToGrid(p.movement.path[1].x), y: snapToGrid(p.movement.path[1].y) }] } }; }));
     } else { // Resize
@@ -741,7 +793,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     if ('touches' in e) {
         editorTouchId.current = null;
     }
-  }, [platforms]);
+  }, [platforms, checkpoints, traps, snapToGrid]);
   
   const handleEditorInteraction = (pos: Vector2D) => {
     switch(activeTool) {
@@ -781,9 +833,40 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
       setSelectedObjectId(newId);
     } else if (type === 'trap') {
         const [width, height] = [80, 20];
-        const targetPlatform = platforms.filter(p => pos.x >= p.position.x && pos.x < p.position.x + p.width && pos.y > p.position.y).sort((a,b) => a.position.y - b.position.y)[0] || null;
-        if (!targetPlatform) return;
-        const newTrap: TrapData = { id: newId, type: 'spikes', position: { x: snapToGrid(pos.x - width/2), y: targetPlatform.position.y - height }, width, height, platformId: targetPlatform.id };
+        const snappedX = snapToGrid(pos.x - width/2);
+        
+        const potentialPlatforms = platforms.filter(p => 
+            pos.x >= p.position.x && 
+            pos.x < p.position.x + p.width
+        );
+
+        let closestPlatform: PlatformData | null = null;
+        let minDistance = Infinity;
+        
+        for (const p of potentialPlatforms) {
+            const distance = pos.y - p.position.y;
+            if (distance >= 0 && distance < minDistance) {
+                minDistance = distance;
+                closestPlatform = p;
+            }
+        }
+        
+        const newTrap: TrapData = closestPlatform 
+            ? { 
+                id: newId, 
+                type: 'spikes', 
+                position: { x: snappedX, y: closestPlatform.position.y - height }, 
+                width, height, 
+                platformId: closestPlatform.id 
+              }
+            : { 
+                id: newId, 
+                type: 'spikes', 
+                position: { x: snappedX, y: snapToGrid(pos.y - height/2) }, 
+                width, height, 
+                platformId: null 
+              };
+
         setTraps(prev => [...prev, newTrap]);
         setSelectedObjectId(newId);
     }
@@ -821,10 +904,9 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     let cursorElement = null;
     const ghostStyle = { opacity: 0.5 };
     switch(activeTool) {
-// FIX: Added missing onTouchStart and onResizeHandleTouchStart props to ghost components.
-        case 'add-platform': cursorElement = <div style={ghostStyle}><Platform id={-1} position={{x: snapToGrid(editorCursor.pos.x - 75), y: snapToGrid(editorCursor.pos.y - 10)}} width={150} height={20} isSelected={false} isEditable={false} onMouseDown={()=>{}} onTouchStart={() => {}} onResizeHandleMouseDown={()=>{}} onResizeHandleTouchStart={() => {}} isHovered={false}/></div>; break;
-        case 'add-checkpoint': cursorElement = <div style={ghostStyle}><Checkpoint id={-1} position={{x: snapToGrid(editorCursor.pos.x - 20), y: snapToGrid(editorCursor.pos.y - 20)}} width={40} height={40} isActive={false} isSelected={false} isEditable={false} onMouseDown={()=>{}} onTouchStart={() => {}} isHovered={false}/></div>; break;
-        case 'add-trap': cursorElement = <div style={ghostStyle}><Trap id={-1} type="spikes" position={{x: snapToGrid(editorCursor.pos.x - 40), y: snapToGrid(editorCursor.pos.y - 10)}} width={80} height={20} isSelected={false} isEditable={false} onMouseDown={()=>{}} onTouchStart={() => {}} onResizeHandleMouseDown={()=>{}} onResizeHandleTouchStart={() => {}} isHovered={false}/></div>; break;
+        case 'add-platform': cursorElement = <div style={ghostStyle}><Platform id={-1} position={{x: snapToGrid(editorCursor.pos.x - 75), y: snapToGrid(editorCursor.pos.y - 10)}} width={150} height={20} isSelected={false} isEditable={false} onMouseDown={()=>{}} onTouchStart={() => {}} onResizeHandleMouseDown={()=>{}} onResizeHandleTouchStart={() => {}} isHovered={false} isTouchDevice={isTouchDevice} isBeingDragged={false} activeHandle={null}/></div>; break;
+        case 'add-checkpoint': cursorElement = <div style={ghostStyle}><Checkpoint id={-1} position={{x: snapToGrid(editorCursor.pos.x - 20), y: snapToGrid(editorCursor.pos.y - 20)}} width={40} height={40} isActive={false} isSelected={false} isEditable={false} onMouseDown={()=>{}} onTouchStart={() => {}} isHovered={false} isBeingDragged={false}/></div>; break;
+        case 'add-trap': cursorElement = <div style={ghostStyle}><Trap id={-1} type="spikes" position={{x: snapToGrid(editorCursor.pos.x - 40), y: snapToGrid(editorCursor.pos.y - 10)}} width={80} height={20} isSelected={false} isEditable={false} onMouseDown={()=>{}} onTouchStart={() => {}} onResizeHandleMouseDown={()=>{}} onResizeHandleTouchStart={() => {}} isHovered={false} isTouchDevice={isTouchDevice} isBeingDragged={false} activeHandle={null}/></div>; break;
         default: cursorElement = <div className="absolute w-6 h-6 -translate-x-1/2 -translate-y-1/2 border-2 border-white rounded-full pointer-events-none" style={{ left: editorCursor.pos.x, top: editorCursor.pos.y, zIndex: 200 }}><div className="w-1.5 h-1.5 bg-white rounded-full absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"/></div>;
     }
     return <div className="absolute top-0 left-0 pointer-events-none" style={{transform: `translateY(${-cameraY}px)`, zIndex: 150}}>{cursorElement}</div>
@@ -908,18 +990,40 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
                     onTouchStart={handleGameAreaInteractionStart}
                 >
                     {THEME_CONFIG[theme].scenery.map(scenery => <Scenery key={scenery.id} {...scenery} cameraY={cameraY} />)}
-                    {platforms.map(platform => <Platform key={platform.id} {...platform} isSelected={mode === 'edit' && selectedObjectId === platform.id} isEditable={mode === 'edit'} onMouseDown={(e) => handleEditorInteractionStart(e, platform.id, 'platform')} onTouchStart={(e) => handleEditorInteractionStart(e, platform.id, 'platform')} onResizeHandleMouseDown={(e, dir) => handleEditorInteractionStart(e, platform.id, 'platform', dir)} onResizeHandleTouchStart={(e, dir) => handleEditorInteractionStart(e, platform.id, 'platform', dir)} isHovered={hoveredObjectId === platform.id} />)}
-                    {checkpoints.map(checkpoint => <Checkpoint key={checkpoint.id} {...checkpoint} isActive={activeCheckpoints.has(checkpoint.id)} isSelected={mode === 'edit' && selectedObjectId === checkpoint.id} isEditable={mode === 'edit'} onMouseDown={(e) => handleEditorInteractionStart(e, checkpoint.id, 'checkpoint')} onTouchStart={(e) => handleEditorInteractionStart(e, checkpoint.id, 'checkpoint')} isHovered={hoveredObjectId === checkpoint.id} />)}
-                    {traps.map(trap => <Trap key={trap.id} {...trap} isSelected={mode === 'edit' && selectedObjectId === trap.id} isEditable={mode === 'edit'} onMouseDown={(e) => handleEditorInteractionStart(e, trap.id, 'trap')} onTouchStart={(e) => handleEditorInteractionStart(e, trap.id, 'trap')} onResizeHandleMouseDown={(e, dir) => handleEditorInteractionStart(e, trap.id, 'trap', dir)} onResizeHandleTouchStart={(e, dir) => handleEditorInteractionStart(e, trap.id, 'trap', dir)} isHovered={hoveredObjectId === trap.id} />)}
-                    {mode === 'edit' && platforms.map(p => {
-                        if (!p.movement || (selectedObjectId !== p.id && !(isEditingPath && selectedObjectId === p.id))) return null;
-                        const [start, end] = p.movement.path;
+                    {platforms.map(platform => {
+                        const isBeingDragged = editorAction.current?.type === 'move' && editorAction.current.objectId === platform.id;
+                        let activeHandle: 'left' | 'right' | null = null;
+                        if (editorAction.current?.objectId === platform.id) {
+                            if (editorAction.current.type === 'resize-left') activeHandle = 'left';
+                            else if (editorAction.current.type === 'resize-right') activeHandle = 'right';
+                        }
+                        return <Platform key={platform.id} {...platform} isSelected={mode === 'edit' && selectedObjectId === platform.id} isEditable={mode === 'edit'} onMouseDown={(e) => handleEditorInteractionStart(e, platform.id, 'platform')} onTouchStart={(e) => handleEditorInteractionStart(e, platform.id, 'platform')} onResizeHandleMouseDown={(e, dir) => handleEditorInteractionStart(e, platform.id, 'platform', dir)} onResizeHandleTouchStart={(e, dir) => handleEditorInteractionStart(e, platform.id, 'platform', dir)} isHovered={hoveredObjectId === platform.id} isTouchDevice={isTouchDevice} isBeingDragged={isBeingDragged} activeHandle={activeHandle} />
+                    })}
+                    {checkpoints.map(checkpoint => {
+                        const isBeingDragged = editorAction.current?.type === 'move' && editorAction.current.objectId === checkpoint.id;
+                        return <Checkpoint key={checkpoint.id} {...checkpoint} isActive={activeCheckpoints.has(checkpoint.id)} isSelected={mode === 'edit' && selectedObjectId === checkpoint.id} isEditable={mode === 'edit'} onMouseDown={(e) => handleEditorInteractionStart(e, checkpoint.id, 'checkpoint')} onTouchStart={(e) => handleEditorInteractionStart(e, checkpoint.id, 'checkpoint')} isHovered={hoveredObjectId === checkpoint.id} isBeingDragged={isBeingDragged}/>
+                    })}
+                    {traps.map(trap => {
+                        const isBeingDragged = editorAction.current?.type === 'move' && editorAction.current.objectId === trap.id;
+                        let activeHandle: 'left' | 'right' | null = null;
+                        if (editorAction.current?.objectId === trap.id) {
+                            if (editorAction.current.type === 'resize-left') activeHandle = 'left';
+                            else if (editorAction.current.type === 'resize-right') activeHandle = 'right';
+                        }
+                        return <Trap key={trap.id} {...trap} isSelected={mode === 'edit' && selectedObjectId === trap.id} isEditable={mode === 'edit'} onMouseDown={(e) => handleEditorInteractionStart(e, trap.id, 'trap')} onTouchStart={(e) => handleEditorInteractionStart(e, trap.id, 'trap')} onResizeHandleMouseDown={(e, dir) => handleEditorInteractionStart(e, trap.id, 'trap', dir)} onResizeHandleTouchStart={(e, dir) => handleEditorInteractionStart(e, trap.id, 'trap', dir)} isHovered={hoveredObjectId === trap.id} isTouchDevice={isTouchDevice} isBeingDragged={isBeingDragged} activeHandle={activeHandle}/>
+                    })}
+                    {/* FIX: Renamed map parameter from 'p' to 'platform' to avoid potential scoping issues and improve readability. */}
+                    {mode === 'edit' && platforms.map(platform => {
+                        if (!platform.movement || (selectedObjectId !== platform.id && !(isEditingPath && selectedObjectId === platform.id))) return null;
+                        const [start, end] = platform.movement.path;
+                        const anchorSize = isTouchDevice ? 24 : 16;
+                        const isPathAnchorDragged = editorAction.current?.type === 'move-path-end' && editorAction.current.objectId === platform.id;
                         return (
-                            <React.Fragment key={`path-overlay-${p.id}`}>
+                            <React.Fragment key={`path-overlay-${platform.id}`}>
                                 <svg className="absolute top-0 left-0 w-full h-full overflow-visible pointer-events-none" style={{ zIndex: 100 }}>
-                                    <line x1={start.x + p.width/2} y1={start.y + p.height/2} x2={end.x + p.width/2} y2={end.y + p.height/2} stroke="rgba(255, 255, 100, 0.7)" strokeWidth="2" strokeDasharray="6,6" />
+                                    <line x1={start.x + platform.width/2} y1={start.y + platform.height/2} x2={end.x + platform.width/2} y2={end.y + platform.height/2} stroke="rgba(255, 255, 100, 0.7)" strokeWidth="2" strokeDasharray="6,6" />
                                 </svg>
-                                <div className="absolute w-4 h-4 bg-yellow-400 rounded-full border-2 border-white cursor-pointer" style={{ left: end.x + p.width/2 - 8, top: end.y + p.height/2 - 8, zIndex: 101 }} onMouseDown={(e) => handleEditorInteractionStart(e, p.id, 'platform', 'move-path-end')} onTouchStart={(e) => handleEditorInteractionStart(e, p.id, 'platform', 'move-path-end')} />
+                                <div className={`absolute bg-yellow-400 rounded-full border-2 border-white cursor-pointer transition-transform duration-100 ${isPathAnchorDragged ? 'scale-150' : ''}`} style={{ left: end.x + platform.width/2 - anchorSize/2, top: end.y + platform.height/2 - anchorSize/2, width: anchorSize, height: anchorSize, zIndex: 101 }} onMouseDown={(e) => handleEditorInteractionStart(e, platform.id, 'platform', 'move-path-end')} onTouchStart={(e) => handleEditorInteractionStart(e, platform.id, 'platform', 'move-path-end')} />
                             </React.Fragment>
                         )
                     })}
@@ -971,7 +1075,6 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
             `}>
                 <EditorSidebar
                     theme={theme}
-// FIX: Changed `setTheme` to `onSetTheme` to match the prop name passed to GameView.
                     onSetTheme={onSetTheme}
                     onDeleteSelected={handleDeleteSelected}
                     isObjectSelected={selectedObjectId !== null}

@@ -9,6 +9,9 @@ interface TrapProps extends TrapData {
   onResizeHandleMouseDown: (e: React.MouseEvent, direction: 'left' | 'right') => void;
   onResizeHandleTouchStart: (e: React.TouchEvent, direction: 'left' | 'right') => void;
   isHovered: boolean;
+  isTouchDevice: boolean;
+  isBeingDragged: boolean;
+  activeHandle: 'left' | 'right' | null;
 }
 
 const Spikes: React.FC<{width: number, height: number}> = ({ width, height }) => {
@@ -32,7 +35,7 @@ const assetMap = {
     spikes: Spikes,
 };
 
-export const Trap: React.FC<TrapProps> = ({ type, position, width, height, isSelected, isEditable, onMouseDown, onTouchStart, onResizeHandleMouseDown, onResizeHandleTouchStart, isHovered }) => {
+export const Trap: React.FC<TrapProps> = ({ type, position, width, height, isSelected, isEditable, onMouseDown, onTouchStart, onResizeHandleMouseDown, onResizeHandleTouchStart, isHovered, isTouchDevice, isBeingDragged, activeHandle }) => {
   const getFilter = () => {
     if (isSelected) return 'drop-shadow(0px 0px 8px rgba(239, 68, 68, 0.9))';
     if (isHovered) return 'drop-shadow(0px 0px 8px rgba(255, 255, 255, 0.8))';
@@ -46,14 +49,19 @@ export const Trap: React.FC<TrapProps> = ({ type, position, width, height, isSel
   const cursorStyle = isEditable ? 'cursor-move' : '';
   const TrapComponent = assetMap[type];
 
+  const handleSizeClass = isTouchDevice ? 'w-6 h-6' : 'w-3 h-3';
+  const leftHandlePosClass = isTouchDevice ? '-left-3' : '-left-1.5';
+  const rightHandlePosClass = isTouchDevice ? '-right-3' : '-right-1.5';
+
   return (
     <div
-      className={`absolute ${cursorStyle}`}
+      className={`absolute ${cursorStyle} transition-transform duration-100 ${isBeingDragged ? 'z-50' : ''}`}
       style={{
         left: position.x,
         top: position.y,
         width: width,
         height: height,
+        transform: isBeingDragged ? 'scale(1.2)' : 'scale(1)',
         ...interactionStyle
       }}
       onMouseDown={isEditable ? onMouseDown : undefined}
@@ -63,12 +71,12 @@ export const Trap: React.FC<TrapProps> = ({ type, position, width, height, isSel
       {isSelected && (
         <>
           <div 
-            className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-red-500 rounded-full border-2 border-white cursor-ew-resize"
+            className={`absolute top-1/2 -translate-y-1/2 bg-red-500 rounded-full border-2 border-white cursor-ew-resize transition-transform duration-100 ${handleSizeClass} ${leftHandlePosClass} ${activeHandle === 'left' ? 'scale-150' : ''}`}
             onMouseDown={(e) => onResizeHandleMouseDown(e, 'left')}
             onTouchStart={(e) => onResizeHandleTouchStart(e, 'left')}
           />
           <div
-            className="absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-red-500 rounded-full border-2 border-white cursor-ew-resize"
+            className={`absolute top-1/2 -translate-y-1/2 bg-red-500 rounded-full border-2 border-white cursor-ew-resize transition-transform duration-100 ${handleSizeClass} ${rightHandlePosClass} ${activeHandle === 'right' ? 'scale-150' : ''}`}
             onMouseDown={(e) => onResizeHandleMouseDown(e, 'right')}
             onTouchStart={(e) => onResizeHandleTouchStart(e, 'right')}
           />

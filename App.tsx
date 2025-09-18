@@ -109,7 +109,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className={`flex flex-col justify-center items-center h-screen w-screen overflow-hidden font-sans transition-colors duration-500 ${THEME_CONFIG[theme].bg}`}>
+    <div className={`flex flex-col justify-center items-center w-screen min-h-screen font-sans transition-colors duration-500 ${THEME_CONFIG[theme].bg} ${appState === 'game' ? 'h-screen overflow-hidden' : ''}`}>
       {renderContent()}
     </div>
   );

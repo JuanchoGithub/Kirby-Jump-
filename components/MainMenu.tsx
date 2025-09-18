@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useGamepadInput } from '../hooks/useGamepadInput';
-import { useIsTouchDevice } from '../hooks/useIsTouchDevice';
+import { useMobileDetection } from '../hooks/useIsTouchDevice';
 
 interface MainMenuProps {
     onPlayOriginal: () => void;
@@ -23,9 +23,16 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onPlayOriginal, onGoToSelect
     const prevGamepadState = useRef(gamepadState);
     const lastNavTime = useRef(0);
     const mountTime = useRef(Date.now());
-    const isTouchDevice = useIsTouchDevice();
+    const { isTouch, isIOS } = useMobileDetection();
 
     const handleFullScreen = () => {
+        if (isIOS) {
+            // This trick hides the address bar on iOS Safari by scrolling the page down slightly.
+            // It requires the page to be scrollable.
+            window.scrollTo(0, 1);
+            return;
+        }
+        
         if (document.fullscreenEnabled) {
             if (!document.fullscreenElement) {
                 document.documentElement.requestFullscreen().catch(err => {
@@ -43,8 +50,8 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onPlayOriginal, onGoToSelect
         { label: 'Level Editor', action: onGoToEditor },
     ];
 
-    if (isTouchDevice) {
-        menuItems.push({ label: 'Go Fullscreen', action: handleFullScreen });
+    if (isTouch) {
+        menuItems.push({ label: isIOS ? 'Maximize View' : 'Go Fullscreen', action: handleFullScreen });
     }
 
     useEffect(() => {
@@ -76,7 +83,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onPlayOriginal, onGoToSelect
     }, [gamepadState, menuItems, focusedIndex]);
 
     return (
-        <div className="flex flex-col justify-center items-center bg-gray-800 bg-opacity-50 p-8 sm:p-12 rounded-2xl shadow-2xl">
+        <div className="flex flex-col justify-center items-center bg-gray-800 bg-opacity-50 p-8 sm:p-12 rounded-2xl shadow-2xl mb-1">
             <h1 className="text-4xl text-center sm:text-6xl font-bold text-white mb-4" style={{ textShadow: '3px 3px 6px rgba(0,0,0,0.7)' }}>
                 Kirby's Ascent
             </h1>
