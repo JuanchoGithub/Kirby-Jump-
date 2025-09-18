@@ -110,6 +110,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     originalObject: PlatformData | CheckpointData | TrapData,
     attachedTraps?: { trapId: number, offset: Vector2D }[]
   } | null>(null);
+  const editorTouchId = useRef<number | null>(null);
 
   const nextId = useRef(Math.max(
     0,
@@ -577,23 +578,64 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     setConfirmFocusIndex(0);
   };
 
-  const getEventPosition = (e: React.MouseEvent | React.TouchEvent): Vector2D => {
-    const touch = 'touches' in e ? e.touches[0] : null;
-    const clientX = touch ? touch.clientX : (e as React.MouseEvent).clientX;
-    const clientY = touch ? touch.clientY : (e as React.MouseEvent).clientY;
-
+  // FIX: Correctly handle React's synthetic event types to avoid conflicts with native DOM types.
+  // Replaced native Touch/MouseEvent types with React's, and fixed iteration over non-iterable TouchList.
+  const getEventPosition = useCallback((e: React.MouseEvent | React.TouchEvent): Vector2D | null => {
+    let touchToUse: React.Touch | React.MouseEvent | undefined;
+  
+    if ('touches' in e) {
+      let relevantTouches: React.TouchList;
+      // touchend events don't have the touch in `touches`, only `changedTouches`
+      if (e.type === 'touchend' || e.type === 'touchcancel') {
+        relevantTouches = e.changedTouches;
+      } else {
+        relevantTouches = e.touches;
+      }
+  
+      if (editorTouchId.current !== null) {
+        // Find the touch we are tracking
+        for (let i = 0; i < relevantTouches.length; i++) {
+          const touch = relevantTouches.item(i);
+          if (touch.identifier === editorTouchId.current) {
+            touchToUse = touch;
+            break;
+          }
+        }
+      }
+      
+      // Fallback for start events or if the tracked touch wasn't found
+      if (!touchToUse && e.changedTouches.length > 0) {
+        touchToUse = e.changedTouches[0];
+      }
+  
+      if (!touchToUse) return null;
+    } else {
+      touchToUse = e;
+    }
+  
     if (!gameAreaRef.current) return { x: 0, y: 0 };
     const rect = gameAreaRef.current.getBoundingClientRect();
     
-    // Adjust for scaling
-    const x = (clientX - rect.left) / scale;
-    const y = (clientY - rect.top) / scale;
-
+    const x = (touchToUse.clientX - rect.left) / scale;
+    const y = (touchToUse.clientY - rect.top) / scale;
+  
     return { x, y: y + cameraY };
-  };
+  }, [cameraY, scale]);
   
   const handleEditorInteractionStart = (e: React.MouseEvent | React.TouchEvent, objectId: number, type: 'platform' | 'checkpoint' | 'trap', handle?: 'left' | 'right' | 'move-path-end') => {
     e.stopPropagation();
+
+    if ('touches' in e) {
+        if (editorTouchId.current !== null || e.changedTouches.length === 0) return;
+        editorTouchId.current = e.changedTouches[0].identifier;
+    }
+    
+    const startPos = getEventPosition(e);
+    if (!startPos) {
+        if ('touches' in e) editorTouchId.current = null;
+        return;
+    }
+
     setActiveTool('select');
     setSelectedObjectId(objectId);
     let objectList = type === 'platform' ? platforms : type === 'checkpoint' ? checkpoints : traps;
@@ -604,14 +646,22 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
         attachedTrapsInfo = traps.filter(t => t.platformId === (originalObject as PlatformData).id).map(t => ({ trapId: t.id, offset: { x: t.position.x - originalObject.position.x, y: t.position.y - originalObject.position.y } }));
     }
     const actionType = handle ? (handle === 'left' ? 'resize-left' : handle === 'right' ? 'resize-right' : handle) : 'move';
-    editorAction.current = { type: actionType, objectId, startPos: getEventPosition(e), originalObject, attachedTraps: attachedTrapsInfo };
+    editorAction.current = { type: actionType, objectId, startPos, originalObject, attachedTraps: attachedTrapsInfo };
   };
 
-  const handleEditorInteractionMove = (e: React.MouseEvent | React.TouchEvent) => {
-    if ('touches' in e) { e.preventDefault(); }
+  const handleEditorInteractionMove = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    if ('touches' in e) { 
+        e.preventDefault(); 
+        // If not tracking a touch, don't do anything for move events
+        if (editorTouchId.current === null && editorAction.current) return;
+    }
+
     const currentPos = getEventPosition(e);
+    if (!currentPos) return;
+
     setEditorCursor({ pos: currentPos, visible: true });
     if (!editorAction.current) return;
+
     const { type, startPos, objectId, originalObject } = editorAction.current;
     const delta = { x: currentPos.x - startPos.x, y: currentPos.y - startPos.y };
     if (type === 'move') {
@@ -656,10 +706,21 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
         if (newWidth >= GRID_SIZE) setTraps(prev => prev.map(t => t.id === objectId ? { ...t, position: { ...t.position, x: newX }, width: newWidth } : t));
       }
     }
-  };
+  }, [getEventPosition, platforms, checkpoints, traps]);
 
-  const handleEditorInteractionEnd = () => {
-    if (!editorAction.current) return;
+  const handleEditorInteractionEnd = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    if ('touches' in e) {
+        if (editorTouchId.current !== null) {
+            const touchEnded = Array.from(e.changedTouches).some(t => t.identifier === editorTouchId.current);
+            if (!touchEnded) return; // Not our touch.
+        }
+    }
+
+    if (!editorAction.current) {
+        if ('touches' in e) editorTouchId.current = null;
+        return;
+    }
+
     const { type, objectId } = editorAction.current;
     
     if (type === 'move') {
@@ -677,7 +738,10 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     }
     
     editorAction.current = null;
-  };
+    if ('touches' in e) {
+        editorTouchId.current = null;
+    }
+  }, [platforms]);
   
   const handleEditorInteraction = (pos: Vector2D) => {
     switch(activeTool) {
@@ -803,16 +867,19 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
   };
   
   const handleGameAreaInteractionStart = (e: React.MouseEvent | React.TouchEvent) => {
-    if (e.target === e.currentTarget) handleEditorInteraction(getEventPosition(e));
+    if (e.target === e.currentTarget && mode === 'edit') {
+        const pos = getEventPosition(e);
+        if(pos) handleEditorInteraction(pos);
+    }
   }
   
-  const handleGameAreaInteractionMove = (e: React.MouseEvent | React.TouchEvent) => {
+  const handleGameAreaInteractionMove = useCallback((e: React.MouseEvent | React.TouchEvent) => {
       if (mode === 'edit') handleEditorInteractionMove(e);
-  }
+  }, [mode, handleEditorInteractionMove]);
   
-  const handleGameAreaInteractionEnd = (e: React.MouseEvent | React.TouchEvent) => {
-      if (mode === 'edit') handleEditorInteractionEnd();
-  }
+  const handleGameAreaInteractionEnd = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+      if (mode === 'edit') handleEditorInteractionEnd(e);
+  }, [mode, handleEditorInteractionEnd]);
 
   return (
     <div className={`w-full h-full flex items-center justify-center relative ${mode === 'edit' && !isTouchDevice ? 'flex-row' : 'flex-col lg:flex-row'}`}>
@@ -827,6 +894,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
                 onMouseUp={handleGameAreaInteractionEnd}
                 onTouchMove={handleGameAreaInteractionMove}
                 onTouchEnd={handleGameAreaInteractionEnd}
+                onTouchCancel={handleGameAreaInteractionEnd}
             >
                 <div 
                     ref={gameAreaRef}
