@@ -2,9 +2,7 @@ import React from 'react';
 import { SceneryData } from '../types';
 import { GAME_WIDTH } from '../constants';
 
-interface SceneryProps extends SceneryData {
-    cameraY: number;
-}
+interface SceneryProps extends SceneryData {}
 
 const Cloud1: React.FC = () => (
     <div className="w-full h-full">
@@ -84,17 +82,8 @@ const assetMap: { [key in SceneryData['asset']]: React.ReactElement } = {
     shootingStar: <ShootingStar />,
 };
 
-export const Scenery: React.FC<SceneryProps> = ({ id, asset, position, width, height, depth, cameraY }) => {
-  // To counteract the main container's scroll (-cameraY), we apply a positive transform.
-  // The amount of transform is proportional to the camera's position and inversely proportional to the depth.
-  // This makes distant objects appear to scroll slower.
-  const parallaxY = cameraY * (1 - 1 / depth);
-
-  const wrapperStyle: React.CSSProperties = {
-    // Force the element onto its own compositing layer to prevent rendering glitches
-    // in complex, transformed/animated scenes.
-    transform: 'translateZ(0px)',
-  };
+export const Scenery: React.FC<SceneryProps> = ({ id, asset, position, width, height }) => {
+  const wrapperStyle: React.CSSProperties = {};
   let wrapperClassName = '';
 
   if (asset === 'cloud1' || asset === 'cloud2') {
@@ -118,7 +107,6 @@ export const Scenery: React.FC<SceneryProps> = ({ id, asset, position, width, he
         top: position.y,
         width: width,
         height: height,
-        transform: `translateY(${parallaxY}px)`,
         zIndex: 0
       }}
     >

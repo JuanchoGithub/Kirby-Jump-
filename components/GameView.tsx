@@ -989,7 +989,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
                     onMouseDown={handleGameAreaInteractionStart}
                     onTouchStart={handleGameAreaInteractionStart}
                 >
-                    {THEME_CONFIG[theme].scenery.map(scenery => <Scenery key={scenery.id} {...scenery} cameraY={cameraY} />)}
+                    {THEME_CONFIG[theme].scenery.map(scenery => <Scenery key={scenery.id} {...scenery} />)}
                     {platforms.map(platform => {
                         const isBeingDragged = editorAction.current?.type === 'move' && editorAction.current.objectId === platform.id;
                         let activeHandle: 'left' | 'right' | null = null;
