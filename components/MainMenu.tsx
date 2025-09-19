@@ -6,6 +6,7 @@ interface MainMenuProps {
     onPlayOriginal: () => void;
     onGoToSelect: () => void;
     onGoToEditor: () => void;
+    onPlayImpossible: () => void;
 }
 
 const MenuButton: React.FC<{onClick: () => void, isFocused: boolean, children: React.ReactNode}> = ({ onClick, isFocused, children }) => (
@@ -17,7 +18,7 @@ const MenuButton: React.FC<{onClick: () => void, isFocused: boolean, children: R
     </button>
 );
 
-export const MainMenu: React.FC<MainMenuProps> = ({ onPlayOriginal, onGoToSelect, onGoToEditor }) => {
+export const MainMenu: React.FC<MainMenuProps> = ({ onPlayOriginal, onGoToSelect, onGoToEditor, onPlayImpossible }) => {
     const [focusedIndex, setFocusedIndex] = useState(0);
     const gamepadState = useGamepadInput();
     const prevGamepadState = useRef(gamepadState);
@@ -46,6 +47,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onPlayOriginal, onGoToSelect
 
     const menuItems = [
         { label: 'Play Original Level', action: onPlayOriginal },
+        { label: "Rocco's Impossible Level", action: onPlayImpossible },
         { label: 'My Levels', action: onGoToSelect },
         { label: 'Level Editor', action: onGoToEditor },
     ];
