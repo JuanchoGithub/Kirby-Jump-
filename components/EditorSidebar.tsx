@@ -188,6 +188,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                         {selectedObject?.type === 'platform' && ( <> <ControlHelp button="RT (hold)" action="Set Move Path" /> <ControlHelp button="D-Pad ↕" action="Change Speed" /> </> )}
                         <ControlHelp button="R Stick" action="Move Object" />
                         <ControlHelp button="D-Pad ↔" action="Resize Width" />
+                        <ControlHelp button="X" action="Delete Object" />
                         <ControlHelp button="B" action="Deselect" />
                     </>
                 ) : (

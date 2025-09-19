@@ -97,6 +97,8 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
   const [confirmFocusIndex, setConfirmFocusIndex] = useState(0);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [exitConfirmFocusIndex, setExitConfirmFocusIndex] = useState(0);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmFocusIndex, setDeleteConfirmFocusIndex] = useState(0);
   const [isEditingPath, setIsEditingPath] = useState(false);
   const [scale, setScale] = useState(1);
   const { isTouch: isTouchDevice } = useMobileDetection();
@@ -236,7 +238,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
   }, [selectedObjectId, platforms, checkpoints, traps]);
 
   const handleEditorGamepadInput = useCallback(() => {
-    if (isSidebarFocused || showTestConfirm || showExitConfirm) return;
+    if (isSidebarFocused || showTestConfirm || showExitConfirm || showDeleteConfirm) return;
 
     const deadzone = 0.2;
     const cursorSpeed = 8;
@@ -261,6 +263,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     // --- Button Presses ---
     const aButtonPressed = gamepadState.buttons[0]?.pressed && !prevGamepadState.current.buttons[0]?.pressed;
     const bButtonPressed = gamepadState.buttons[1]?.pressed && !prevGamepadState.current.buttons[1]?.pressed;
+    const xButtonPressed = gamepadState.buttons[2]?.pressed && !prevGamepadState.current.buttons[2]?.pressed;
     const yButtonPressed = gamepadState.buttons[3]?.pressed && !prevGamepadState.current.buttons[3]?.pressed;
     const lbPressed = gamepadState.buttons[4]?.pressed && !prevGamepadState.current.buttons[4]?.pressed;
     const rbPressed = gamepadState.buttons[5]?.pressed && !prevGamepadState.current.buttons[5]?.pressed;
@@ -276,6 +279,11 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     const dpadRight = gamepadState.buttons[15]?.pressed;
 
     // --- High-Priority Actions & State Transitions ---
+    if (xButtonPressed && selectedObjectId !== null) {
+        setShowDeleteConfirm(true);
+        setDeleteConfirmFocusIndex(0);
+        return;
+    }
     if (startButtonPressed) { handleRequestTestLevel(); return; }
     if (viewButtonPressed) { setIsSidebarFocused(true); setIsSidebarOpen(true); return; }
     if (bButtonPressed) { setSelectedObjectId(null); }
@@ -377,7 +385,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
         setActiveTool(EDITOR_TOOLS[(currentIndex + direction + EDITOR_TOOLS.length) % EDITOR_TOOLS.length]);
     }
 
-  }, [gamepadState, editorCursor, cameraY, activeTool, hoveredObjectId, selectedObjectId, selectedObjectData, isSidebarFocused, platforms, traps, checkpoints, isEditingPath, theme, onSetTheme, handleUpdatePlatform]);
+  }, [gamepadState, editorCursor, cameraY, activeTool, hoveredObjectId, selectedObjectId, selectedObjectData, isSidebarFocused, platforms, traps, checkpoints, isEditingPath, theme, onSetTheme, handleUpdatePlatform, showDeleteConfirm]);
 
   const gameTick = useCallback((deltaTime: number) => {
     if (mode === 'edit') {
@@ -519,7 +527,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     prevGamepadState.current = gamepadState;
   }, [cameraY, activeCheckpoints, isFinished, platforms, checkpoints, traps, mode, movingPlatformState, gamepadState, handleEditorGamepadInput, editorCursor.pos, selectedObjectId, activeTool, hoveredObjectId, onScreenControls, activeKeys]);
 
-  useGameLoop(gameTick, isFinished || showTestConfirm || showExitConfirm || (mode === 'edit' && isSidebarFocused));
+  useGameLoop(gameTick, isFinished || showTestConfirm || showExitConfirm || showDeleteConfirm || (mode === 'edit' && isSidebarFocused));
   
   const handleDeleteSelected = useCallback(() => {
     if (selectedObjectId === null) return;
@@ -552,7 +560,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
   }, [isFinished, gamepadState, resetGame, initialMode]);
 
   useEffect(() => {
-    if (!showTestConfirm && !showExitConfirm) return;
+    if (!showTestConfirm && !showExitConfirm && !showDeleteConfirm) return;
 
     const dpadLeftPressed = gamepadState.buttons[14]?.pressed && !prevGamepadState.current.buttons[14]?.pressed;
     const dpadRightPressed = gamepadState.buttons[15]?.pressed && !prevGamepadState.current.buttons[15]?.pressed;
@@ -576,9 +584,19 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
             else setShowExitConfirm(false); // Cancel
         }
         if (bButtonPressed) setShowExitConfirm(false);
+    } else if (showDeleteConfirm) {
+        if (dpadRightPressed) setDeleteConfirmFocusIndex(i => (i + 1) % 2);
+        if (dpadLeftPressed) setDeleteConfirmFocusIndex(i => (i - 1 + 2) % 2);
+        if (aButtonPressed) {
+            if (deleteConfirmFocusIndex === 0) { // Delete
+                handleDeleteSelected();
+            }
+            setShowDeleteConfirm(false);
+        }
+        if (bButtonPressed) setShowDeleteConfirm(false); // Cancel
     }
     prevGamepadState.current = gamepadState;
-  }, [showTestConfirm, showExitConfirm, gamepadState, confirmFocusIndex, exitConfirmFocusIndex, onExit, handleToggleMode, handleSave, handleConfirmExit]);
+  }, [showTestConfirm, showExitConfirm, showDeleteConfirm, gamepadState, confirmFocusIndex, exitConfirmFocusIndex, deleteConfirmFocusIndex, onExit, handleToggleMode, handleSave, handleConfirmExit, handleDeleteSelected]);
 
   const handleRequestTestLevel = () => {
     setShowTestConfirm(true);
@@ -957,6 +975,33 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
         </div>
     );
   };
+
+  const renderDeleteConfirmDialog = () => {
+    if (!showDeleteConfirm) return null;
+    const confirmButtons = ["Delete", "Cancel"];
+    return (
+        <div className="absolute inset-0 bg-black bg-opacity-60 flex flex-col justify-center items-center z-50">
+            <div className="bg-gray-800 p-8 rounded-xl shadow-2xl border border-gray-700 text-white">
+                <h2 className="text-2xl font-bold mb-4 text-center">Confirm Deletion</h2>
+                <p className="text-gray-300 mb-6">Are you sure you want to delete this item?</p>
+                <div className="flex justify-center items-center gap-4">
+                    {confirmButtons.map((text, index) => (
+                        <button
+                            key={text}
+                            onClick={() => {
+                                if (index === 0) handleDeleteSelected();
+                                setShowDeleteConfirm(false);
+                            }}
+                            className={`px-6 py-2 rounded-lg font-bold transition-all transform hover:scale-105 ${index === deleteConfirmFocusIndex ? 'ring-2 ring-yellow-400' : ''} ${index === 0 ? 'bg-red-600 hover:bg-red-500' : 'bg-gray-600 hover:bg-gray-500'}`}
+                        >
+                            {text}
+                        </button>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+  };
   
   const handleGameAreaInteractionStart = (e: React.MouseEvent | React.TouchEvent) => {
     if (e.target === e.currentTarget && mode === 'edit') {
@@ -1042,6 +1087,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
                 {renderEditorCursor()}
                 {renderConfirmDialog()}
                 {renderExitConfirmDialog()}
+                {renderDeleteConfirmDialog()}
                 {isFinished && (
                 <div className="absolute inset-0 bg-black bg-opacity-50 flex flex-col justify-center items-center z-50">
                     <h1 className="text-4xl sm:text-6xl font-bold text-white mb-4" style={{textShadow: '2px 2px 4px rgba(0,0,0,0.5)'}}>You Win!</h1>
