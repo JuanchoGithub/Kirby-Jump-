@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { LevelData, PlatformData, CheckpointData, TrapData } from '../types';
+import { LevelData, PlatformData, CheckpointData, TrapData, SignData } from '../types';
 import { getLevels, deleteLevel, saveLevel } from '../utils/levelStore';
 import { useGamepadInput } from '../hooks/useGamepadInput';
 
@@ -32,6 +32,7 @@ const isValidLevelData = (data: any): data is LevelData => {
         Array.isArray(data.platforms) &&
         Array.isArray(data.checkpoints) &&
         (data.traps === undefined || Array.isArray(data.traps)) &&
+        (data.signs === undefined || Array.isArray(data.signs)) &&
         data.platforms.every(isValidPlatform) &&
         data.checkpoints.every((c: any): c is CheckpointData => 
             typeof c.id === 'number' &&
@@ -48,6 +49,15 @@ const isValidLevelData = (data: any): data is LevelData => {
             typeof t.width === 'number' &&
             typeof t.height === 'number' &&
             (t.platformId === undefined || t.platformId === null || typeof t.platformId === 'number')
+        )) &&
+        (data.signs === undefined || data.signs.every((s: any): s is SignData =>
+            typeof s.id === 'number' &&
+            typeof s.variant === 'string' &&
+            ['effortless', 'easy', 'medium', 'hard', 'impossible', 'extreme'].includes(s.variant) &&
+            typeof s.position?.x === 'number' &&
+            typeof s.position?.y === 'number' &&
+            typeof s.width === 'number' &&
+            typeof s.height === 'number'
         ))
     );
 };

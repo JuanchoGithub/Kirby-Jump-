@@ -28,6 +28,12 @@ export interface TrapData extends GameObject {
   platformId?: number | null;
 }
 
+export type SignVariant = 'effortless' | 'easy' | 'medium' | 'hard' | 'impossible' | 'extreme';
+
+export interface SignData extends GameObject {
+  variant: SignVariant;
+}
+
 export type Theme = 'day' | 'afternoon' | 'night' | 'twilight';
 
 export interface SceneryData extends GameObject {
@@ -50,4 +56,5 @@ export interface LevelData {
   platforms: PlatformData[];
   checkpoints: CheckpointData[];
   traps: TrapData[];
+  signs?: SignData[];
 }

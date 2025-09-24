@@ -18,6 +18,7 @@ const ORIGINAL_LEVEL: LevelData = {
   platforms: INITIAL_PLATFORMS,
   checkpoints: INITIAL_CHECKPOINTS,
   traps: INITIAL_TRAPS,
+  signs: [],
 };
 
 const IMPOSSIBLE_LEVEL: LevelData = {
@@ -82,7 +83,8 @@ const IMPOSSIBLE_LEVEL: LevelData = {
     { "id": 10, "type": "spikes", "position": { "x": 260, "y": 3940 }, "width": 10, "height": 20, "platformId": 4 },
     { "id": 11, "type": "spikes", "position": { "x": 250, "y": 3940 }, "width": 10, "height": 20, "platformId": 4 },
     { "id": 38, "type": "spikes", "position": { "x": 60, "y": 3960 }, "width": 520, "height": 20, "platformId": 0 }
-  ]
+  ],
+  "signs": []
 };
 
 const App: React.FC = () => {
@@ -123,6 +125,7 @@ const App: React.FC = () => {
         platforms: [{ id: 0, position: { x: 300 - GAME_WIDTH / 2, y: 3980 }, width: GAME_WIDTH, height: 20 }],
         checkpoints: [],
         traps: [],
+        signs: [],
       });
     }
     setInitialMode('edit');

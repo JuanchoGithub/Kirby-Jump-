@@ -3,6 +3,7 @@ import { Player } from './Player';
 import { Platform } from './Platform';
 import { Checkpoint } from './Checkpoint';
 import { Trap } from './Trap';
+import { Sign } from './Sign';
 import { Scenery } from './Scenery';
 import { EditorSidebar } from './EditorSidebar';
 import { OnScreenControls, OnScreenControlsState } from './OnScreenControls';
@@ -10,7 +11,7 @@ import { useGameLoop } from '../hooks/useGameLoop';
 import { useKeyboardInput } from '../hooks/useKeyboardInput';
 import { useGamepadInput } from '../hooks/useGamepadInput';
 import { useMobileDetection } from '../hooks/useIsTouchDevice';
-import { PlayerState, Vector2D, PlatformData, CheckpointData, LevelData, Theme, TrapData, GameObject } from '../types';
+import { PlayerState, Vector2D, PlatformData, CheckpointData, LevelData, Theme, TrapData, GameObject, SignData, SignVariant } from '../types';
 import {
   GRAVITY, JUMP_STRENGTH, PLAYER_SPEED, PLAYER_WIDTH, PLAYER_HEIGHT,
   GAME_WIDTH, GAME_HEIGHT, CAMERA_SCROLL_THRESHOLD, LEVEL_HEIGHT_MAX, GRID_SIZE
@@ -27,8 +28,8 @@ const THEME_CONFIG = {
 };
 const THEMES: Theme[] = ['day', 'afternoon', 'night', 'twilight'];
 
-export type EditorTool = 'select' | 'add-platform' | 'add-checkpoint' | 'add-trap';
-const EDITOR_TOOLS: EditorTool[] = ['select', 'add-platform', 'add-checkpoint', 'add-trap'];
+export type EditorTool = 'select' | 'add-platform' | 'add-checkpoint' | 'add-trap' | 'add-sign';
+const EDITOR_TOOLS: EditorTool[] = ['select', 'add-platform', 'add-checkpoint', 'add-trap', 'add-sign'];
 
 const EditIcon = () => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
 
@@ -78,6 +79,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
   const [platforms, setPlatforms] = useState<PlatformData[]>(initialPlatforms);
   const [checkpoints, setCheckpoints] = useState<CheckpointData[]>(levelData.checkpoints);
   const [traps, setTraps] = useState<TrapData[]>(levelData.traps || []);
+  const [signs, setSigns] = useState<SignData[]>(levelData.signs || []);
   const [movingPlatformState, setMovingPlatformState] = useState(initialMovingState);
   const [playerState, setPlayerState] = useState<PlayerState>(() => getInitialPlayerState(levelData.checkpoints));
 
@@ -110,7 +112,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     type: 'move' | 'resize-left' | 'resize-right' | 'move-path-end',
     startPos: Vector2D,
     objectId: number,
-    originalObject: PlatformData | CheckpointData | TrapData,
+    originalObject: PlatformData | CheckpointData | TrapData | SignData,
     attachedTraps?: { trapId: number, offset: Vector2D }[]
   } | null>(null);
   const editorTouchId = useRef<number | null>(null);
@@ -119,7 +121,8 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     0,
     ...levelData.platforms.map(p => p.id),
     ...levelData.checkpoints.map(c => c.id),
-    ...(levelData.traps || []).map(t => t.id)
+    ...(levelData.traps || []).map(t => t.id),
+    ...(levelData.signs || []).map(s => s.id)
   ) + 1);
 
   const activeKeys = useKeyboardInput();
@@ -148,9 +151,9 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     }
     setSaveStatus('saving');
     const platformsToSave = platforms.map(p => p.movement ? { ...p, position: p.movement.path[0] } : p);
-    saveLevelToStorage({ name: trimmedName, platforms: platformsToSave, checkpoints, traps });
+    saveLevelToStorage({ name: trimmedName, platforms: platformsToSave, checkpoints, traps, signs });
     setTimeout(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); }, 500);
-  }, [levelName, levelData.name, platforms, checkpoints, traps]);
+  }, [levelName, levelData.name, platforms, checkpoints, traps, signs]);
 
   const resetGame = useCallback((fullReset: boolean) => {
     const sourcePlatforms = fullReset ? levelData.platforms : platforms;
@@ -164,6 +167,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
       setLevelName(levelData.name);
       setCheckpoints(levelData.checkpoints);
       setTraps(levelData.traps || []);
+      setSigns(levelData.signs || []);
       setPlayerState(getInitialPlayerState(levelData.checkpoints));
     } else {
       setPlayerState(getInitialPlayerState(checkpoints));
@@ -224,6 +228,10 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     }));
   }, []);
 
+  const handleUpdateSign = useCallback((id: number, updates: Partial<SignData>) => {
+    setSigns(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+  }, []);
+
   const snapToGrid = (value: number) => Math.round(value / GRID_SIZE) * GRID_SIZE;
   
   const selectedObjectData = useMemo(() => {
@@ -234,8 +242,10 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
       if (checkpoint) return { id: selectedObjectId, type: 'checkpoint' as const, data: checkpoint };
       const trap = traps.find(t => t.id === selectedObjectId);
       if (trap) return { id: selectedObjectId, type: 'trap' as const, data: trap };
+      const sign = signs.find(s => s.id === selectedObjectId);
+      if (sign) return { id: selectedObjectId, type: 'sign' as const, data: sign };
       return null;
-  }, [selectedObjectId, platforms, checkpoints, traps]);
+  }, [selectedObjectId, platforms, checkpoints, traps, signs]);
 
   const handleEditorGamepadInput = useCallback(() => {
     if (isSidebarFocused || showTestConfirm || showExitConfirm || showDeleteConfirm) return;
@@ -277,6 +287,8 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     const dpadDown = gamepadState.buttons[13]?.pressed;
     const dpadLeft = gamepadState.buttons[14]?.pressed;
     const dpadRight = gamepadState.buttons[15]?.pressed;
+    const dpadLeftPressed = gamepadState.buttons[14]?.pressed && !prevGamepadState.current.buttons[14]?.pressed;
+    const dpadRightPressed = gamepadState.buttons[15]?.pressed && !prevGamepadState.current.buttons[15]?.pressed;
 
     // --- High-Priority Actions & State Transitions ---
     if (xButtonPressed && selectedObjectId !== null) {
@@ -352,6 +364,8 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
                 setCheckpoints(prev => prev.map(c => c.id === selectedObjectId ? { ...c, position: { x: c.position.x + delta.x, y: c.position.y + delta.y } } : c));
             } else if (selectedObjectData?.type === 'trap') {
                 setTraps(prev => prev.map(t => t.id === selectedObjectId ? { ...t, position: { x: t.position.x + delta.x, y: t.position.y + delta.y }, platformId: null } : t));
+            } else if (selectedObjectData?.type === 'sign') {
+                setSigns(prev => prev.map(s => s.id === selectedObjectId ? { ...s, position: { x: s.position.x + delta.x, y: s.position.y + delta.y } } : s));
             }
         } else if (prevRightStickActive && !rightStickActive && selectedObjectId !== null) {
             // Snap on release logic
@@ -365,10 +379,19 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
                     return { ...p, position: newPos, movement: newMovement };
                 }));
             } else if (selectedObjectData?.type === 'checkpoint') { setCheckpoints(prev => prev.map(c => c.id === selectedObjectId ? { ...c, position: { x: snapToGrid(c.position.x), y: snapToGrid(c.position.y) } } : c));
-            } else if (selectedObjectData?.type === 'trap') { const trap = traps.find(t => t.id === selectedObjectId); if (!trap) return; const targetPlatform = platforms.find(p => trap.position.x + trap.width / 2 > p.position.x && trap.position.x + trap.width / 2 < p.position.x + p.width && Math.abs((trap.position.y + trap.height) - p.position.y) < GRID_SIZE * 2 ) || null; setTraps(prev => prev.map(t => t.id === selectedObjectId ? { ...t, position: { x: snapToGrid(t.position.x), y: targetPlatform ? targetPlatform.position.y - t.height : snapToGrid(t.position.y) }, platformId: targetPlatform?.id ?? null } : t)); }
+            } else if (selectedObjectData?.type === 'trap') { const trap = traps.find(t => t.id === selectedObjectId); if (!trap) return; const targetPlatform = platforms.find(p => trap.position.x + trap.width / 2 > p.position.x && trap.position.x + trap.width / 2 < p.position.x + p.width && Math.abs((trap.position.y + trap.height) - p.position.y) < GRID_SIZE * 2 ) || null; setTraps(prev => prev.map(t => t.id === selectedObjectId ? { ...t, position: { x: snapToGrid(t.position.x), y: targetPlatform ? targetPlatform.position.y - t.height : snapToGrid(t.position.y) }, platformId: targetPlatform?.id ?? null } : t));
+            } else if (selectedObjectData?.type === 'sign') { setSigns(prev => prev.map(s => s.id === selectedObjectId ? { ...s, position: { x: snapToGrid(s.position.x), y: snapToGrid(s.position.y) } } : s)); }
         }
 
-        if (selectedObjectId !== null && (dpadLeft || dpadRight)) {
+        if (selectedObjectData?.type === 'sign' && (dpadLeftPressed || dpadRightPressed)) {
+            const SIGN_VARIANTS_ORDER: SignVariant[] = ['effortless', 'easy', 'medium', 'hard', 'impossible', 'extreme'];
+            const currentVariant = selectedObjectData.data.variant;
+            const currentIndex = SIGN_VARIANTS_ORDER.indexOf(currentVariant);
+            const direction = dpadRightPressed ? 1 : -1;
+            const nextIndex = (currentIndex + direction + SIGN_VARIANTS_ORDER.length) % SIGN_VARIANTS_ORDER.length;
+            const nextVariant = SIGN_VARIANTS_ORDER[nextIndex];
+            handleUpdateSign(selectedObjectId!, { variant: nextVariant });
+        } else if (selectedObjectId !== null && (dpadLeft || dpadRight)) {
             const resizeAmount = dpadRight ? GRID_SIZE : -GRID_SIZE;
             if (selectedObjectData?.type === 'platform') { setPlatforms(prev => prev.map(p => p.id === selectedObjectId && p.width + resizeAmount >= GRID_SIZE * 2 ? { ...p, width: p.width + resizeAmount } : p));
             } else if (selectedObjectData?.type === 'trap') { setTraps(prev => prev.map(t => t.id === selectedObjectId && t.width + resizeAmount >= GRID_SIZE ? { ...t, width: t.width + resizeAmount } : t)); }
@@ -385,7 +408,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
         setActiveTool(EDITOR_TOOLS[(currentIndex + direction + EDITOR_TOOLS.length) % EDITOR_TOOLS.length]);
     }
 
-  }, [gamepadState, editorCursor, cameraY, activeTool, hoveredObjectId, selectedObjectId, selectedObjectData, isSidebarFocused, platforms, traps, checkpoints, isEditingPath, theme, onSetTheme, handleUpdatePlatform, showDeleteConfirm]);
+  }, [gamepadState, editorCursor, cameraY, activeTool, hoveredObjectId, selectedObjectId, selectedObjectData, isSidebarFocused, platforms, traps, checkpoints, signs, isEditingPath, theme, onSetTheme, handleUpdatePlatform, handleUpdateSign, showDeleteConfirm]);
 
   const gameTick = useCallback((deltaTime: number) => {
     if (mode === 'edit') {
@@ -393,7 +416,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
         if (activeTool === 'select' && !selectedObjectId) {
             let newHoveredId: number | null = null;
             const { x, y } = editorCursor.pos;
-            const allObjects: GameObject[] = [...platforms, ...checkpoints, ...traps];
+            const allObjects: GameObject[] = [...platforms, ...checkpoints, ...traps, ...signs];
             const objectsUnderCursor = allObjects.filter(obj => x >= obj.position.x && x <= obj.position.x + obj.width && y >= obj.position.y && y <= obj.position.y + obj.height).sort((a, b) => b.id - a.id);
             if (objectsUnderCursor.length > 0) newHoveredId = objectsUnderCursor[0].id;
             setHoveredObjectId(newHoveredId);
@@ -525,7 +548,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
       return { position, velocity, isGrounded, lastCheckpoint, isJumping: !isGrounded && velocity.y < 0, isFalling: !isGrounded && velocity.y > 0, groundedOnPlatformId };
     });
     prevGamepadState.current = gamepadState;
-  }, [cameraY, activeCheckpoints, isFinished, platforms, checkpoints, traps, mode, movingPlatformState, gamepadState, handleEditorGamepadInput, editorCursor.pos, selectedObjectId, activeTool, hoveredObjectId, onScreenControls, activeKeys]);
+  }, [cameraY, activeCheckpoints, isFinished, platforms, checkpoints, traps, signs, mode, movingPlatformState, gamepadState, handleEditorGamepadInput, editorCursor.pos, selectedObjectId, activeTool, hoveredObjectId, onScreenControls, activeKeys]);
 
   useGameLoop(gameTick, isFinished || showTestConfirm || showExitConfirm || showDeleteConfirm || (mode === 'edit' && isSidebarFocused));
   
@@ -535,6 +558,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     setPlatforms(prev => prev.filter(p => p.id !== selectedObjectId));
     setCheckpoints(prev => prev.filter(c => c.id !== selectedObjectId));
     setTraps(prev => prev.filter(t => t.id !== selectedObjectId && (!isPlatform || t.platformId !== selectedObjectId)));
+    setSigns(prev => prev.filter(s => s.id !== selectedObjectId));
     setSelectedObjectId(null);
   }, [platforms, selectedObjectId]);
   
@@ -616,8 +640,9 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
   
       if (editorTouchId.current !== null) {
         for (let i = 0; i < relevantTouches.length; i++) {
-          const touch = relevantTouches.item(i);
-          if (touch.identifier === editorTouchId.current) {
+          // FIX: Add explicit type and null check for 'touch' to prevent runtime errors and fix TS error.
+          const touch: React.Touch | null = relevantTouches.item(i);
+          if (touch && touch.identifier === editorTouchId.current) {
             touchToUse = touch;
             break;
           }
@@ -642,7 +667,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     return { x, y: y + cameraY };
   }, [cameraY, scale]);
   
-  const handleEditorInteractionStart = (e: React.MouseEvent | React.TouchEvent, objectId: number, type: 'platform' | 'checkpoint' | 'trap', handle?: 'left' | 'right' | 'move-path-end') => {
+  const handleEditorInteractionStart = (e: React.MouseEvent | React.TouchEvent, objectId: number, type: 'platform' | 'checkpoint' | 'trap' | 'sign', handle?: 'left' | 'right' | 'move-path-end') => {
     e.stopPropagation();
 
     if ('touches' in e) {
@@ -658,7 +683,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
 
     setActiveTool('select');
     setSelectedObjectId(objectId);
-    let objectList = type === 'platform' ? platforms : type === 'checkpoint' ? checkpoints : traps;
+    let objectList = type === 'platform' ? platforms : type === 'checkpoint' ? checkpoints : type === 'trap' ? traps : signs;
     const originalObject = objectList.find(o => o.id === objectId);
     if (!originalObject) return;
     let attachedTrapsInfo: { trapId: number, offset: Vector2D }[] | undefined = undefined;
@@ -729,6 +754,9 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
         } else {
             setTraps(prev => prev.map(t => t.id === objectId ? { ...t, position: newPos, platformId: null } : t));
         }
+      } else if (signs.some(s => s.id === objectId)) {
+        const newPos = { x: originalObject.position.x + delta.x, y: originalObject.position.y + delta.y };
+        setSigns(prev => prev.map(s => s.id === objectId ? { ...s, position: newPos } : s));
       }
     } else if (type === 'move-path-end') {
         const platform = originalObject as PlatformData;
@@ -748,12 +776,13 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
         if (newWidth >= GRID_SIZE) setTraps(prev => prev.map(t => t.id === objectId ? { ...t, position: { ...t.position, x: newX }, width: newWidth } : t));
       }
     }
-  }, [getEventPosition, platforms, checkpoints, traps]);
+  }, [getEventPosition, platforms, checkpoints, traps, signs]);
 
   const handleEditorInteractionEnd = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     if ('touches' in e) {
         if (editorTouchId.current !== null) {
-            const touchEnded = Array.from(e.changedTouches).some(t => t.identifier === editorTouchId.current);
+            // FIX: Explicitly type `t` as `React.Touch` to resolve error where it was being inferred as `unknown`.
+            const touchEnded = Array.from(e.changedTouches).some((t: React.Touch) => t.identifier === editorTouchId.current);
             if (!touchEnded) return; // Not our touch.
         }
     }
@@ -769,6 +798,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
         const platformToMove = platforms.find(p => p.id === objectId);
         const checkpointToMove = checkpoints.find(c => c.id === objectId);
         const trapToMove = traps.find(t => t.id === objectId);
+        const signToMove = signs.find(s => s.id === objectId);
 
         if (platformToMove) {
             const newPos = { x: snapToGrid(platformToMove.position.x), y: snapToGrid(platformToMove.position.y) };
@@ -806,6 +836,8 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
                     return { ...t, position: { x: finalX, y: snapToGrid(finalY) }, platformId: null };
                 }
             }));
+        } else if (signToMove) {
+            setSigns(prev => prev.map(s => s.id === objectId ? { ...s, position: { x: snapToGrid(s.position.x), y: snapToGrid(s.position.y) } } : s));
         }
     } else if (type === 'move-path-end') {
         setPlatforms(prev => prev.map(p => { if (p.id !== objectId || !p.movement) return p; return { ...p, movement: { ...p.movement, path: [p.movement.path[0], { x: snapToGrid(p.movement.path[1].x), y: snapToGrid(p.movement.path[1].y) }] } }; }));
@@ -813,6 +845,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
         if (platforms.some(p => p.id === objectId)) {
             setPlatforms(prev => prev.map(p => { if (p.id !== objectId) return p; const newWidth = snapToGrid(p.width); const widthDiff = newWidth - p.width; const newX = type === 'resize-left' ? p.position.x - widthDiff : p.position.x; return { ...p, position: { ...p.position, x: newX }, width: newWidth }; }));
         } else if (traps.some(t => t.id === objectId)) {
+            // FIX: Corrected a copy-paste error where 'p' was used instead of 't', which is the current item in the map function.
             setTraps(prev => prev.map(t => { if (t.id !== objectId) return t; const newWidth = snapToGrid(t.width); const widthDiff = newWidth - t.width; const newX = type === 'resize-left' ? t.position.x - widthDiff : t.position.x; return { ...t, position: { ...t.position, x: newX }, width: newWidth }; }));
         }
     }
@@ -821,13 +854,14 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     if ('touches' in e) {
         editorTouchId.current = null;
     }
-  }, [platforms, checkpoints, traps, snapToGrid]);
+  }, [platforms, checkpoints, traps, signs, snapToGrid]);
   
   const handleEditorInteraction = (pos: Vector2D) => {
     switch(activeTool) {
         case 'add-platform': handleAddObject('platform', pos); break;
         case 'add-checkpoint': handleAddObject('checkpoint', pos); break;
         case 'add-trap': handleAddObject('trap', pos); break;
+        case 'add-sign': handleAddObject('sign', pos); break;
         case 'select': setSelectedObjectId(null); break;
     }
   };
@@ -847,7 +881,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     setCameraY(y => Math.max(0, Math.min(y + e.deltaY, LEVEL_HEIGHT_MAX - GAME_HEIGHT)));
   };
 
-  const handleAddObject = (type: 'platform' | 'checkpoint' | 'trap', pos: Vector2D) => {
+  const handleAddObject = (type: 'platform' | 'checkpoint' | 'trap' | 'sign', pos: Vector2D) => {
     const newId = nextId.current++;
     if (type === 'platform') {
       const [width, height] = [150, 20];
@@ -897,6 +931,11 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
 
         setTraps(prev => [...prev, newTrap]);
         setSelectedObjectId(newId);
+    } else if (type === 'sign') {
+        const [width, height] = [120, 80];
+        const newSign: SignData = { id: newId, position: { x: snapToGrid(pos.x - width/2), y: snapToGrid(pos.y - height) }, width, height, variant: 'easy' };
+        setSigns(prev => [...prev, newSign]);
+        setSelectedObjectId(newId);
     }
     setActiveTool('select');
   };
@@ -905,7 +944,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
     const trimmedName = levelName.trim();
     if (!trimmedName) { alert("Please enter a name for the level before exporting."); return; }
     const platformsToSave = platforms.map(p => p.movement ? { ...p, position: p.movement.path[0] } : p);
-    const levelToExport: LevelData = { name: trimmedName, platforms: platformsToSave, checkpoints, traps };
+    const levelToExport: LevelData = { name: trimmedName, platforms: platformsToSave, checkpoints, traps, signs };
     const dataStr = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(levelToExport, null, 2))}`;
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute("href", dataStr);
@@ -935,6 +974,7 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
         case 'add-platform': cursorElement = <div style={ghostStyle}><Platform id={-1} position={{x: snapToGrid(editorCursor.pos.x - 75), y: snapToGrid(editorCursor.pos.y - 10)}} width={150} height={20} isSelected={false} isEditable={false} onMouseDown={()=>{}} onTouchStart={() => {}} onResizeHandleMouseDown={()=>{}} onResizeHandleTouchStart={() => {}} isHovered={false} isTouchDevice={isTouchDevice} isBeingDragged={false} activeHandle={null}/></div>; break;
         case 'add-checkpoint': cursorElement = <div style={ghostStyle}><Checkpoint id={-1} position={{x: snapToGrid(editorCursor.pos.x - 20), y: snapToGrid(editorCursor.pos.y - 20)}} width={40} height={40} isActive={false} isSelected={false} isEditable={false} onMouseDown={()=>{}} onTouchStart={() => {}} isHovered={false} isBeingDragged={false}/></div>; break;
         case 'add-trap': cursorElement = <div style={ghostStyle}><Trap id={-1} type="spikes" position={{x: snapToGrid(editorCursor.pos.x - 40), y: snapToGrid(editorCursor.pos.y - 10)}} width={80} height={20} isSelected={false} isEditable={false} onMouseDown={()=>{}} onTouchStart={() => {}} onResizeHandleMouseDown={()=>{}} onResizeHandleTouchStart={() => {}} isHovered={false} isTouchDevice={isTouchDevice} isBeingDragged={false} activeHandle={null}/></div>; break;
+        case 'add-sign': cursorElement = <div style={ghostStyle}><Sign id={-1} position={{x: snapToGrid(editorCursor.pos.x - 60), y: snapToGrid(editorCursor.pos.y - 80)}} width={120} height={80} variant="easy" isSelected={false} isEditable={false} onMouseDown={()=>{}} onTouchStart={() => {}} isHovered={false} isBeingDragged={false}/></div>; break;
         default: cursorElement = <div className="absolute w-6 h-6 -translate-x-1/2 -translate-y-1/2 border-2 border-white rounded-full pointer-events-none" style={{ left: editorCursor.pos.x, top: editorCursor.pos.y, zIndex: 200 }}><div className="w-1.5 h-1.5 bg-white rounded-full absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"/></div>;
     }
     return <div className="absolute top-0 left-0 pointer-events-none" style={{transform: `translateY(${-cameraY}px)`, zIndex: 150}}>{cursorElement}</div>
@@ -1067,6 +1107,10 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
                         }
                         return <Trap key={trap.id} {...trap} isSelected={mode === 'edit' && selectedObjectId === trap.id} isEditable={mode === 'edit'} onMouseDown={(e) => handleEditorInteractionStart(e, trap.id, 'trap')} onTouchStart={(e) => handleEditorInteractionStart(e, trap.id, 'trap')} onResizeHandleMouseDown={(e, dir) => handleEditorInteractionStart(e, trap.id, 'trap', dir)} onResizeHandleTouchStart={(e, dir) => handleEditorInteractionStart(e, trap.id, 'trap', dir)} isHovered={hoveredObjectId === trap.id} isTouchDevice={isTouchDevice} isBeingDragged={isBeingDragged} activeHandle={activeHandle}/>
                     })}
+                    {signs.map(sign => {
+                        const isBeingDragged = editorAction.current?.type === 'move' && editorAction.current.objectId === sign.id;
+                        return <Sign key={sign.id} {...sign} isSelected={mode === 'edit' && selectedObjectId === sign.id} isEditable={mode === 'edit'} onMouseDown={(e) => handleEditorInteractionStart(e, sign.id, 'sign')} onTouchStart={(e) => handleEditorInteractionStart(e, sign.id, 'sign')} isHovered={hoveredObjectId === sign.id} isBeingDragged={isBeingDragged} />
+                    })}
                     {/* FIX: Renamed map parameter from 'p' to 'platform' to avoid potential scoping issues and improve readability. */}
                     {mode === 'edit' && platforms.map(platform => {
                         if (!platform.movement || (selectedObjectId !== platform.id && !(isEditingPath && selectedObjectId === platform.id))) return null;
@@ -1141,8 +1185,9 @@ export const GameView: React.FC<GameViewProps> = ({ levelData, initialMode, onEx
                     levelName={levelName}
                     onLevelNameChange={setLevelName}
                     saveStatus={saveStatus}
-                    selectedObject={selectedObjectData?.type === 'platform' ? selectedObjectData : null}
+                    selectedObject={(selectedObjectData?.type === 'platform' || selectedObjectData?.type === 'sign') ? selectedObjectData : null}
                     onUpdatePlatform={handleUpdatePlatform}
+                    onUpdateSign={handleUpdateSign}
                     activeTool={activeTool}
                     onSetTool={setActiveTool}
                     gamepadState={gamepadState}

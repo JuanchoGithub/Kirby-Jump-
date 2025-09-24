@@ -54,7 +54,8 @@ export const OnScreenControls: React.FC<OnScreenControlsProps> = ({ onChange }) 
     const handleJoystickMove = (e: React.TouchEvent) => {
         if (joystickTouchId.current === null) return;
         
-        const touch = Array.from(e.touches).find(t => t.identifier === joystickTouchId.current);
+        // FIX: Explicitly type `t` as `React.Touch` to fix `unknown` type error.
+        const touch = Array.from(e.touches).find((t: React.Touch) => t.identifier === joystickTouchId.current);
         if (!touch) return;
         
         const deltaX = touch.clientX - joystickCenter.current.x;
@@ -82,7 +83,8 @@ export const OnScreenControls: React.FC<OnScreenControlsProps> = ({ onChange }) 
     };
 
     const handleJoystickEnd = (e: React.TouchEvent) => {
-        const touchEnded = Array.from(e.changedTouches).some(t => t.identifier === joystickTouchId.current);
+        // FIX: Explicitly type `t` as `React.Touch` to fix `unknown` type error.
+        const touchEnded = Array.from(e.changedTouches).some((t: React.Touch) => t.identifier === joystickTouchId.current);
         if (!touchEnded) return;
 
         joystickTouchId.current = null;
